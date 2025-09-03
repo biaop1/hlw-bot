@@ -2,8 +2,8 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 
-TOKEN = "PUT_YOUR_BOT_TOKEN_HERE"
-CHANNEL_ID = 123456789012345678  # Replace with your channel ID
+TOKEN = "MTQxMjc4MTQzMzA1MDYyODE2OA.G2zuhh.qU2_xFfI_RDm0WCLUZ4C3EE4atuueOvX7_mY6Y"
+CHANNEL_ID = 1412772946845634642  # Replace with your channel ID
 API_URL = "https://api.wc3stats.com/gamelist"
 
 intents = discord.Intents.default()
@@ -34,3 +34,4 @@ async def fetch_games():
                             await channel.send(msg)
 
 bot.run(TOKEN)
+
