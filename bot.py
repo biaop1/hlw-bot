@@ -1,16 +1,17 @@
-import os
 import discord
 from discord.ext import commands, tasks
 import aiohttp
+import os
 
-# ===== Config =====
-TOKEN = os.getenv("bot_token")  # must match Railway variable name
-CHANNEL_ID = 1412772946845634642  # your channel ID (leave as int)
+TOKEN = os.getenv("bot_token")
+CHANNEL_ID = 1412772946845634642
 API_URL = "https://api.wc3stats.com/gamelist"
 
-# ===== Intents & Bot =====
-# We don't need privileged message_content intent to just SEND messages.
+# --- BOT INTENTS ---
 intents = discord.Intents.default()
+intents.members = True  # <<< important for role assignment
+
+# --- BOT INSTANCE ---
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = set()
@@ -64,6 +65,7 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
 
 
 
