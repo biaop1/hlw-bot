@@ -17,12 +17,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 posted_games = set()
 
 
+# --- ROLE ASSIGNMENT ---
 @bot.event
 async def on_member_join(member):
-    # Replace with the exact role name you want to assign
-    role_name = "Member"
-
-    # Find the role in the server
+    role_name = "Member"  # <<< change if your role has another name
     role = discord.utils.get(member.guild.roles, name=role_name)
 
     if role:
@@ -32,12 +30,14 @@ async def on_member_join(member):
         print(f"Role '{role_name}' not found in {member.guild.name}")
 
 
+# --- READY EVENT ---
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    fetch_games.start()   # ✅ only start the loop here
+    fetch_games.start()   # ✅ only start the loop here, nothing else
 
 
+# --- GAME FETCH LOOP ---
 @tasks.loop(seconds=10)  # check every 10 seconds
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
@@ -46,10 +46,12 @@ async def fetch_games():
                 data = await resp.json()
                 games = data.get("result", [])
 
-                if len(games) > 0:  # ✅ only print if not 0
+                # Only print if not 0 games
+                if len(games) > 0:
                     print(f"Fetched {len(games)} games")
 
-                for game in games:   # ✅ this loop BELONGS here
+                ### HERE is where the loop belongs
+                for game in games:
                     name = game.get("name", "")
                     map_name = game.get("map", "")
 
@@ -71,4 +73,5 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 
+# --- RUN BOT ---
 bot.run(TOKEN)
