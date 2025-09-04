@@ -15,6 +15,7 @@ intents.members = True  # <<< important for role assignment
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = set()
+
 @bot.event
 async def on_member_join(member):
     # Replace with the exact role name you want to assign
@@ -29,10 +30,24 @@ async def on_member_join(member):
     else:
         print(f"Role '{role_name}' not found in {member.guild.name}")
 
+
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
     fetch_games.start()
+
+
+# --- BACKGROUND TASK ---
+@tasks.loop(seconds=10)  # check every 10 seconds
+async def fetch_games():
+    async with aiohttp.ClientSession() as session:
+        async with session.get(API_URL) as resp:
+            if resp.status == 200:
+                data = await resp.json()
+
+                num_games = len(data.get("result", []))
+                if num_games > 0:
+                    print(f"Fetched {num_games} games")
 
                 for game in data.get("result", []):  # API returns "result"
                     name = game.get("name", "")
@@ -56,10 +71,6 @@ async def on_ready():
                             else:
                                 print("❌ Could not find channel!")
 
+
+# --- START BOT ---
 bot.run(TOKEN)
-
-
-
-
-
-
