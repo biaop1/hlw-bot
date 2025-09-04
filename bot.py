@@ -34,16 +34,6 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     fetch_games.start()
 
-@tasks.loop(seconds=1)  # check every second
-async def fetch_games():
-    async with aiohttp.ClientSession() as session:
-        async with session.get(API_URL) as resp:
-            if resp.status == 200:
-                data = await resp.json()
-                num_games = len(data.get("result", []))
-if num_games > 0:
-    print(f"Fetched {num_games} games")  # only print if > 0
-
                 for game in data.get("result", []):  # API returns "result"
                     name = game.get("name", "")
                     map_name = game.get("map", "")
@@ -67,6 +57,7 @@ if num_games > 0:
                                 print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
 
 
 
