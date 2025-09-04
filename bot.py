@@ -20,33 +20,35 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     fetch_games.start()
 
-@tasks.loop(seconds=5)  # change to 1 if you insist; 5s is gentler on rate limits
+@tasks.loop(seconds=1)  # check every second
 async def fetch_games():
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(API_URL) as resp:
-                if resp.status != 200:
-                    print(f"API returned status {resp.status}")
-                    return
-
+    async with aiohttp.ClientSession() as session:
+        async with session.get(API_URL) as resp:
+            if resp.status == 200:
                 data = await resp.json()
-                for game in data.get("result", []):
-                    name = game.get("name", "") or ""
-                    map_name = game.get("map", "") or ""
+                print(f"Fetched {len(data.get('result', []))} games")  # 👈 DEBUG
 
-                    text = f"{name} {map_name}".lower()
-                    # include if contains HLW OR hero line; exclude if map contains 8.4a
-                    include = ("hlw" in text) or ("hero line" in text)
-                    exclude = ("8.4a" in map_name.lower())
+                for game in data.get("result", []):  # API returns "result"
+                    name = game.get("name", "")
+                    map_name = game.get("map", "")
+                    print(f"Checking game: {name} (map: {map_name})")  # 👈 DEBUG
 
-                    if include and not exclude:
+                    # Apply your criteria
+                    if (
+                        ("HLW" in name or "HLW" in map_name or
+                         "hero line" in name.lower() or "hero line" in map_name.lower())
+                        and "8.4a" not in map_name
+                    ):
                         game_id = game.get("id")
                         if game_id not in posted_games:
                             posted_games.add(game_id)
                             msg = f"🎮 New HLW game: **{name}** (Map: {map_name})"
-                            channel = await bot.fetch_channel(CHANNEL_ID)
-                            await channel.send(msg)
-    except Exception as e:
-        print(f"Error fetching games: {e}")
+                            print(f"Posting: {msg}")  # 👈 DEBUG
+                            channel = bot.get_channel(CHANNEL_ID)
+                            if channel:
+                                await channel.send(msg)
+                            else:
+                                print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
