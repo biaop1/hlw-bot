@@ -40,7 +40,9 @@ async def fetch_games():
         async with session.get(API_URL) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                print(f"Fetched {len(data.get('result', []))} games")  # 👈 DEBUG
+                num_games = len(data.get("result", []))
+if num_games > 0:
+    print(f"Fetched {num_games} games")  # only print if > 0
 
                 for game in data.get("result", []):  # API returns "result"
                     name = game.get("name", "")
@@ -65,6 +67,7 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
 
 
 
