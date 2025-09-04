@@ -32,7 +32,13 @@ async def fetch_games():
                     for game in data.get("result", []):
                         name = game.get("name", "")
                         map_name = game.get("map", "")
-                        if "HLW" in name.upper() or "HLW" in map_name.upper():
+
+                        # ----- FILTERS -----
+                        text = f"{name} {map_name}".lower()
+                        if (
+                            ("hlw" in text or "hero line" in text)  # must contain HLW or hero line
+                            and "8.4a" not in map_name.lower()      # must NOT contain 8.4a
+                        ):
                             game_id = game.get("id")
                             if game_id not in posted_games:
                                 posted_games.add(game_id)
@@ -44,5 +50,5 @@ async def fetch_games():
     except Exception as e:
         print(f"Error fetching games: {e}")
 
-# ===== Run Bot =====
 bot.run(TOKEN)
+
