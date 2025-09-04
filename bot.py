@@ -14,6 +14,19 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = set()
+@bot.event
+async def on_member_join(member):
+    # Replace with the exact role name you want to assign
+    role_name = "HLW Player"
+
+    # Find the role in the server
+    role = discord.utils.get(member.guild.roles, name=role_name)
+
+    if role:
+        await member.add_roles(role)
+        print(f"Assigned role '{role_name}' to {member.name}")
+    else:
+        print(f"Role '{role_name}' not found in {member.guild.name}")
 
 @bot.event
 async def on_ready():
@@ -51,4 +64,5 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
 
