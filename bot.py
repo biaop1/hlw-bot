@@ -16,6 +16,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = set()
 
+
 @bot.event
 async def on_member_join(member):
     # Replace with the exact role name you want to assign
@@ -34,25 +35,23 @@ async def on_member_join(member):
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    fetch_games.start()
+    fetch_games.start()   # ✅ only start the loop here
 
 
-# --- BACKGROUND TASK ---
 @tasks.loop(seconds=10)  # check every 10 seconds
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
             if resp.status == 200:
                 data = await resp.json()
+                games = data.get("result", [])
 
-                num_games = len(data.get("result", []))
-                if num_games > 0:
-                    print(f"Fetched {num_games} games")
+                if len(games) > 0:  # ✅ only print if not 0
+                    print(f"Fetched {len(games)} games")
 
-                for game in data.get("result", []):  # API returns "result"
+                for game in games:   # ✅ this loop BELONGS here
                     name = game.get("name", "")
                     map_name = game.get("map", "")
-                    print(f"Checking game: {name} (map: {map_name})")  # 👈 DEBUG
 
                     # Apply your criteria
                     if (
@@ -64,7 +63,7 @@ async def fetch_games():
                         if game_id not in posted_games:
                             posted_games.add(game_id)
                             msg = f"🎮 New HLW game: **{name}** (Map: {map_name})"
-                            print(f"Posting: {msg}")  # 👈 DEBUG
+                            print(f"Posting: {msg}")
                             channel = bot.get_channel(CHANNEL_ID)
                             if channel:
                                 await channel.send(msg)
@@ -72,5 +71,4 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 
-# --- START BOT ---
 bot.run(TOKEN)
