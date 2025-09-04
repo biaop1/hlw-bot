@@ -17,7 +17,7 @@ posted_games = set()
 @bot.event
 async def on_member_join(member):
     # Replace with the exact role name you want to assign
-    role_name = "HLW Player"
+    role_name = "Member"
 
     # Find the role in the server
     role = discord.utils.get(member.guild.roles, name=role_name)
@@ -64,5 +64,6 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 bot.run(TOKEN)
+
 
 
