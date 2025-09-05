@@ -95,7 +95,7 @@ async def fetch_games():
                         )
                         embed.add_field(
                             name="Map",
-                            value=f"({map_name})",
+                            value=f"{map_name}",
                             inline=False
                         )
                         embed.add_field(
@@ -125,6 +125,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
