@@ -43,16 +43,9 @@ async def fetch_games():
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
             if resp.status == 200:
-                data = await resp.json()  # ✅ now inside async function
-                print("Raw JSON response:", data)  # 👈 Debug
-
-                games = (
-                    data.get("result")
-                    or data.get("games")
-                    or (data.get("data") or {}).get("result")
-                    or []
-                )
-                print(f"Interpreted games list: {len(games)} found")
+                data = await resp.json()
+                games = data.get("body", [])  # ✅ correct field
+                print(f"Fetched {len(games)} games")
 
                 for game in games:
                     name = game.get("name", "")
@@ -79,3 +72,4 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
