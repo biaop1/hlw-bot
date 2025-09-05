@@ -2,7 +2,9 @@ import discord
 from discord.ext import commands, tasks
 import aiohttp
 import os
+import time
 
+start_time = time.time()  # record when the bot started
 TOKEN = os.getenv("bot_token")
 CHANNEL_ID = 1412772946845634642
 API_URL = "https://api.wc3stats.com/gamelist"
@@ -50,43 +52,49 @@ async def on_ready():
 @tasks.loop(seconds=10)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
-        for page in range(1, 3):  # only pages 1 and 2, safe for <100 games
-            async with session.get(f"{API_URL}?page={page}") as resp:
-                if resp.status != 200:
-                    print(f"❌ Failed to fetch page {page}: {resp.status}")
-                    continue
-
+        async with session.get(API_URL) as resp:
+            if resp.status == 200:
                 data = await resp.json()
-                games = data.get("body", [])
-
-                if not games:
-                    continue
+                games = data.get("body", [])  # ✅ API returns data in "body"
 
                 for game in games:
                     name = game.get("name", "")
                     map_name = game.get("map", "")
+                    realm = game.get("realm", "Unknown")
+                    host = game.get("host", "Unknown")
+                    players = game.get("slotsTaken", 0)
+                    total = game.get("slotsTotal", 0)
 
-                    # your filter criteria
+                    # ✅ Criteria
                     if (
-                        ("HLW" in name or "HLW" in map_name
-                         or "hero line" in name.lower()
-                         or "hero line" in map_name.lower())
-                        and "W8." not in map_name
+                        ("HLW" in name or "HLW" in map_name or
+                         "hero line" in name.lower() or "hero line" in map_name.lower())
+                        and "8.4a" not in map_name
                     ):
                         game_id = game.get("id")
                         if game_id not in posted_games:
                             posted_games.add(game_id)
-                            msg = f"🎮 New HLW game: **{name}** (Map: {map_name})"
+
+                            # format uptime
+                            uptime = int(time.time() - start_time)
+                            minutes, seconds = divmod(uptime, 60)
+
+                            # 3-line message
+                            msg = (
+                                f"Uptime: {minutes}m {seconds}s. Realm: {realm}\n"
+                                f"Gamename: {name} ({map_name})\n"
+                                f"Host: {host} Players: {players}/{total}"
+                            )
+
                             channel = bot.get_channel(CHANNEL_ID)
                             if channel:
                                 await channel.send(msg)
                             else:
                                 print("❌ Could not find channel!")
 
-
-
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
