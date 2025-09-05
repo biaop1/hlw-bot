@@ -85,8 +85,8 @@ async def fetch_games():
                         posted_games.add(game_id)
 
                         # Uptime
-                        uptime_sec = int(time.time() - start_time)
-                        minutes, seconds = divmod(uptime_sec, 60)
+                        uptime_sec = game.get("uptime", 0)
+                        minutes, seconds = divmod(int(uptime_sec), 60)
 
                         # Build embed
                         embed = discord.Embed(
@@ -94,8 +94,8 @@ async def fetch_games():
                             color=discord.Color.green()
                         )
                         embed.add_field(
-                            name="Game name",
-                            value=f"{name} (map: {map_name})",
+                            name="Map",
+                            value=f"({map_name})",
                             inline=False
                         )
                         embed.add_field(
@@ -110,7 +110,7 @@ async def fetch_games():
                         )
                         embed.add_field(
                             name="Players",
-                            value=f"{slots_taken}/{slots_total}",
+                            value=f"{slotsTaken}/{slotsTotal}",
                             inline=True
                         )
                         embed.set_footer(text=f"Uptime: {minutes}m {seconds}s")
@@ -125,6 +125,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
