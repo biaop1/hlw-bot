@@ -37,7 +37,7 @@ async def on_ready():
 
     # Update avatar once
     try:
-        with open(map_icon, "rb") as f:
+        with open(map_icon.png, "rb") as f:
             await bot.user.edit(avatar=f.read())
         print("✅ Avatar updated")
     except Exception as e:
@@ -87,6 +87,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
