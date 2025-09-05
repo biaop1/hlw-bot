@@ -43,7 +43,7 @@ async def on_ready():
             await bot.user.edit(avatar=f.read())
         print("✅ Avatar updated")
     except Exception as e:
-        (f"❌ Failed to update avatar: {e}")
+        print(f"❌ Failed to update avatar: {e}")
 
     fetch_games.start()
 
@@ -68,16 +68,20 @@ async def fetch_games():
                     name = game.get("name", "")
                     map_name = game.get("map", "")
                     host = game.get("host", "")
-                    realm = game.get("realm", "")
+                    server = game.get("server", "")
                     slots_taken = game.get("slots_taken", 0)
                     slots_total = game.get("slots_total", 0)
 
                     # Criteria
                     if (
-                        ("HLW" in name or "HLW" in map_name or
-                         "hero line" in name.lower() or "hero line" in map_name.lower())
-                        and "8.4a" not in map_name
+                        ("hlw" in name.lower() 
+                        or "heroline" in name.lower()
+                        or "hero line" in name.lower()
+                        or "hero line" in map_name.lower()
+                        or "heroline" in map_name.lower())
+                        and "w8." not in map_name.lower()
                     ):
+
                         posted_games.add(game_id)
 
                         # Uptime
@@ -101,7 +105,7 @@ async def fetch_games():
                         )
                         embed.add_field(
                             name="Realm",
-                            value=f"{realm}",
+                            value=f"{server}",
                             inline=True
                         )
                         embed.add_field(
@@ -121,6 +125,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
