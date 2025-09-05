@@ -71,7 +71,7 @@ async def fetch_games():
                         ("HLW" in name or "HLW" in map_name
                          or "hero line" in name.lower()
                          or "hero line" in map_name.lower())
-                        and "8.4a" not in map_name
+                        and "W8." not in map_name
                     ):
                         game_id = game.get("id")
                         if game_id not in posted_games:
@@ -87,6 +87,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
