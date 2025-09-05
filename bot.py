@@ -1,4 +1,4 @@
-    import discord
+import discord
 from discord.ext import commands, tasks
 import aiohttp
 import os
@@ -9,7 +9,7 @@ API_URL = "https://api.wc3stats.com/gamelist"
 
 # --- BOT INTENTS ---
 intents = discord.Intents.default()
-intents.members = True  # <<< important for role assignment
+intents.members = True  # needed for role assignment
 
 # --- BOT INSTANCE ---
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -34,40 +34,35 @@ async def on_member_join(member):
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    fetch_games.start()   # ✅ only start the loop here, nothing else
+    fetch_games.start()   # start the background loop
 
 
 # --- GAME FETCH LOOP ---
-
-@tasks.loop(seconds=10)  # check every 10 seconds
+@tasks.loop(seconds=10)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
             if resp.status == 200:
-                data = await resp.json()
-                data = await resp.json()
-                print("Raw JSON response:", data)
+                data = await resp.json()  # ✅ now inside async function
+                print("Raw JSON response:", data)  # 👈 Debug
 
-                # Experiment with different key pathways based on the actual data.
-                # Example:
-                games = data.get("result") or data.get("games") or (data.get("data") or {}).get("result") or []
-                print("Interpreted games list:", games)
+                games = (
+                    data.get("result")
+                    or data.get("games")
+                    or (data.get("data") or {}).get("result")
+                    or []
+                )
+                print(f"Interpreted games list: {len(games)} found")
 
-                games = data.get("result", [])
-
-                # Only print if not 0 games
-                if len(games) > 0:
-                    print(f"Fetched {len(games)} games")
-
-                ### HERE is where the loop belongs
                 for game in games:
                     name = game.get("name", "")
                     map_name = game.get("map", "")
                     print(f"{name}, {map_name}")
-                    # Apply your criteria
+
                     if (
-                        ("HLW" in name or "HLW" in map_name or
-                         "hero line" in name.lower() or "hero line" in map_name.lower())
+                        ("HLW" in name or "HLW" in map_name
+                         or "hero line" in name.lower()
+                         or "hero line" in map_name.lower())
                         and "8.4a" not in map_name
                     ):
                         game_id = game.get("id")
@@ -84,8 +79,3 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
-
-
-
-
-
