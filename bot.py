@@ -54,7 +54,7 @@ async def fetch_games():
                 for game in games:
                     name = game.get("name", "")
                     map_name = game.get("map", "")
-                        print(f"{name}, {map_name}")
+                    print(f"{name}, {map_name}")
                     # Apply your criteria
                     if (
                         ("HLW" in name or "HLW" in map_name or
@@ -75,5 +75,6 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
