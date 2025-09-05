@@ -69,8 +69,8 @@ async def fetch_games():
                     map_name = game.get("map", "")
                     host = game.get("host", "")
                     server = game.get("server", "")
-                    slots_taken = game.get("slots_taken", 0)
-                    slots_total = game.get("slots_total", 0)
+                    slotsTaken = game.get("slotsTaken", 0)
+                    slotsTotal = game.get("slotsTotal", 0)
 
                     # Criteria
                     if (
@@ -125,6 +125,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
