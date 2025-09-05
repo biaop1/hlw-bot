@@ -1,4 +1,4 @@
-import discord
+    import discord
 from discord.ext import commands, tasks
 import aiohttp
 import os
@@ -38,13 +38,6 @@ async def on_ready():
 
 
 # --- GAME FETCH LOOP ---
-data = await resp.json()
-print("Raw JSON response:", data)
-
-# Experiment with different key pathways based on the actual data.
-# Example:
-games = data.get("result") or data.get("games") or (data.get("data") or {}).get("result") or []
-print("Interpreted games list:", games)
 
 @tasks.loop(seconds=10)  # check every 10 seconds
 async def fetch_games():
@@ -52,6 +45,14 @@ async def fetch_games():
         async with session.get(API_URL) as resp:
             if resp.status == 200:
                 data = await resp.json()
+                data = await resp.json()
+                print("Raw JSON response:", data)
+
+                # Experiment with different key pathways based on the actual data.
+                # Example:
+                games = data.get("result") or data.get("games") or (data.get("data") or {}).get("result") or []
+                print("Interpreted games list:", games)
+
                 games = data.get("result", [])
 
                 # Only print if not 0 games
@@ -83,6 +84,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
