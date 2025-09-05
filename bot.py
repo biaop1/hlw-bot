@@ -49,51 +49,79 @@ async def on_ready():
 
 
 # --- GAME FETCH LOOP ---
-@tasks.loop(seconds=10)
+@tasks.loop(seconds=10)  # check every 10s
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                games = data.get("body", [])  # ✅ API returns data in "body"
+                games = data.get("body", [])
+
+                if len(games) == 0:
+                    return
 
                 for game in games:
+                    game_id = game.get("id")
+                    if game_id in posted_games:
+                        continue
+
                     name = game.get("name", "")
                     map_name = game.get("map", "")
-                    realm = game.get("realm", "Unknown")
-                    host = game.get("host", "Unknown")
-                    players = game.get("slotsTaken", 0)
-                    total = game.get("slotsTotal", 0)
+                    host = game.get("host", "")
+                    realm = game.get("realm", "")
+                    slots_taken = game.get("slots_taken", 0)
+                    slots_total = game.get("slots_total", 0)
 
-                    # ✅ Criteria
+                    # Criteria
                     if (
                         ("HLW" in name or "HLW" in map_name or
                          "hero line" in name.lower() or "hero line" in map_name.lower())
                         and "8.4a" not in map_name
                     ):
-                        game_id = game.get("id")
-                        if game_id not in posted_games:
-                            posted_games.add(game_id)
+                        posted_games.add(game_id)
 
-                            # format uptime
-                            uptime = int(time.time() - start_time)
-                            minutes, seconds = divmod(uptime, 60)
+                        # Uptime
+                        uptime_sec = int(time.time() - start_time)
+                        minutes, seconds = divmod(uptime_sec, 60)
 
-                            # 3-line message
-                            msg = (
-                                f"Uptime: {minutes}m {seconds}s. Realm: {realm}\n"
-                                f"Gamename: {name} ({map_name})\n"
-                                f"Host: {host} Players: {players}/{total}"
-                            )
+                        # Build embed
+                        embed = discord.Embed(
+                            title=f"{name}",
+                            color=discord.Color.green()
+                        )
+                        embed.add_field(
+                            name="Game name",
+                            value=f"{name} (map: {map_name})",
+                            inline=False
+                        )
+                        embed.add_field(
+                            name="Host",
+                            value=f"{host}",
+                            inline=True
+                        )
+                        embed.add_field(
+                            name="Realm",
+                            value=f"{realm}",
+                            inline=True
+                        )
+                        embed.add_field(
+                            name="Players",
+                            value=f"{slots_taken}/{slots_total}",
+                            inline=True
+                        )
+                        embed.set_footer(text=f"Uptime: {minutes}m {seconds}s")
 
-                            channel = bot.get_channel(CHANNEL_ID)
-                            if channel:
-                                await channel.send(msg)
-                            else:
-                                print("❌ Could not find channel!")
+                        # Send
+                        channel = bot.get_channel(CHANNEL_ID)
+                        if channel:
+                            await channel.send(embed=embed)
+                        else:
+                            print("❌ Could not find channel!")
+
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
