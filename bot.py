@@ -41,17 +41,23 @@ async def on_ready():
 @tasks.loop(seconds=10)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
-        async with session.get(API_URL) as resp:
-            if resp.status == 200:
+        for page in range(1, 3):  # only pages 1 and 2, safe for <100 games
+            async with session.get(f"{API_URL}?page={page}") as resp:
+                if resp.status != 200:
+                    print(f"❌ Failed to fetch page {page}: {resp.status}")
+                    continue
+
                 data = await resp.json()
-                games = data.get("body", [])  # ✅ correct field
-                print(f"Fetched {len(games)} games")
+                games = data.get("body", [])
+
+                if not games:
+                    continue
 
                 for game in games:
                     name = game.get("name", "")
                     map_name = game.get("map", "")
-                    print(f"{name}, {map_name}")
 
+                    # your filter criteria
                     if (
                         ("HLW" in name or "HLW" in map_name
                          or "hero line" in name.lower()
@@ -62,7 +68,6 @@ async def fetch_games():
                         if game_id not in posted_games:
                             posted_games.add(game_id)
                             msg = f"🎮 New HLW game: **{name}** (Map: {map_name})"
-                            print(f"Posting: {msg}")
                             channel = bot.get_channel(CHANNEL_ID)
                             if channel:
                                 await channel.send(msg)
@@ -70,6 +75,8 @@ async def fetch_games():
                                 print("❌ Could not find channel!")
 
 
+
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
