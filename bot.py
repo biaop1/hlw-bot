@@ -34,7 +34,16 @@ async def on_member_join(member):
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    fetch_games.start()   # start the background loop
+
+    # Update avatar once
+    try:
+        with open(map_icon, "rb") as f:
+            await bot.user.edit(avatar=f.read())
+        print("✅ Avatar updated")
+    except Exception as e:
+        print(f"❌ Failed to update avatar: {e}")
+
+    fetch_games.start()
 
 
 # --- GAME FETCH LOOP ---
@@ -78,5 +87,6 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
