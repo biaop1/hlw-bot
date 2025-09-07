@@ -1,3 +1,51 @@
+import discord
+from discord.ext import commands, tasks
+import aiohttp
+import os
+import time
+
+start_time = time.time()  # record when the bot started
+TOKEN = os.getenv("bot_token")
+CHANNEL_ID = 1412772946845634642
+API_URL = "https://api.wc3stats.com/gamelist"
+
+# --- BOT INTENTS ---
+intents = discord.Intents.default()
+intents.members = True  # needed for role assignment
+
+# --- BOT INSTANCE ---
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp}
+
+# --- ROLE ASSIGNMENT ---
+@bot.event
+async def on_member_join(member):
+    role_name = "Member"  # <<< change if your role has another name
+    role = discord.utils.get(member.guild.roles, name=role_name)
+
+    if role:
+        await member.add_roles(role)
+        print(f"Assigned role '{role_name}' to {member.name}")
+    else:
+        print(f"Role '{role_name}' not found in {member.guild.name}")
+
+# --- READY EVENT ---
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+
+    # Update avatar once
+    try:
+        with open("map_icon.png", "rb") as f:
+            await bot.user.edit(avatar=f.read())
+        print("✅ Avatar updated")
+    except Exception as e:
+        print(f"❌ Failed to update avatar: {e}")
+
+    fetch_games.start()
+
+
 @tasks.loop(seconds=10)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
