@@ -16,7 +16,7 @@ intents.members = True  # needed for role assignment
 # --- BOT INSTANCE ---
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-posted_games = set()
+posted_games = {}  # game_id -> message
 
 
 # --- ROLE ASSIGNMENT ---
@@ -57,13 +57,15 @@ async def fetch_games():
                 data = await resp.json()
                 games = data.get("body", [])
 
+                # Track current IDs from API
+                active_ids = set()
+
                 if len(games) == 0:
                     return
 
                 for game in games:
                     game_id = game.get("id")
-                    if game_id in posted_games:
-                        continue
+                    active_ids.add(game_id)
 
                     name = game.get("name", "")
                     map_name = game.get("map", "")
@@ -74,15 +76,13 @@ async def fetch_games():
 
                     # Criteria
                     if (
-                        ("hlw" in name.lower() 
-                        or "heroline" in name.lower()
-                        or "hero line" in name.lower()
-                        or "hero line" in map_name.lower()
-                        or "heroline" in map_name.lower())
+                        ("hlw" in name.lower()
+                         or "heroline" in name.lower()
+                         or "hero line" in name.lower()
+                         or "hero line" in map_name.lower()
+                         or "heroline" in map_name.lower())
                         and "w8." not in map_name.lower()
                     ):
-
-                        posted_games.add(game_id)
 
                         # Uptime
                         uptime_sec = game.get("uptime", 0)
@@ -93,47 +93,51 @@ async def fetch_games():
                             title=f"{name}",
                             color=discord.Color.green()
                         )
-                        embed.add_field(
-                            name="Map",
-                            value=f"{map_name}",
-                            inline=False
-                        )
-                        embed.add_field(
-                            name="Host",
-                            value=f"{host}",
-                            inline=True
-                        )
-                        embed.add_field(
-                            name="Realm",
-                            value=f"{server}",
-                            inline=True
-                        )
-                        embed.add_field(
-                            name="Players",
-                            value=f"{slotsTaken}/{slotsTotal}",
-                            inline=True
-                        )
+                        embed.add_field(name="Map", value=f"{map_name}", inline=False)
+                        embed.add_field(name="Host", value=f"{host}", inline=True)
+                        embed.add_field(name="Realm", value=f"{server}", inline=True)
+                        embed.add_field(name="Players", value=f"{slotsTaken}/{slotsTotal}", inline=True)
                         embed.set_footer(text=f"Uptime: {minutes}m {seconds}s")
 
-                        # Send
                         channel = bot.get_channel(CHANNEL_ID)
-                        if channel:
-                            await channel.send(embed=embed)
-                        else:
+                        if not channel:
                             print("❌ Could not find channel!")
+                            return
+
+                        if game_id not in posted_games:
+                            # Send new message
+                            msg = await channel.send(embed=embed)
+                            posted_games[game_id] = msg
+                        else:
+                            # Update existing message
+                            msg = posted_games[game_id]
+                            try:
+                                await msg.edit(embed=embed)
+                            except Exception as e:
+                                print(f"❌ Failed to edit message for {game_id}: {e}")
+
+                # Handle games that disappeared (Closed)
+                for game_id in list(posted_games.keys()):
+                    if game_id not in active_ids:
+                        msg = posted_games.pop(game_id, None)
+                        if msg:
+                            try:
+                                old_embed = msg.embeds[0]
+                                closed_embed = discord.Embed(
+                                    title=old_embed.title,
+                                    color=discord.Color.red()
+                                )
+                                # keep all fields
+                                for field in old_embed.fields:
+                                    closed_embed.add_field(
+                                        name=field.name, value=field.value, inline=field.inline
+                                    )
+                                # replace uptime footer with Closed
+                                closed_embed.set_footer(text="*Closed*")
+                                await msg.edit(embed=closed_embed)
+                            except Exception as e:
+                                print(f"❌ Failed to mark game closed {game_id}: {e}")
 
 
 # --- RUN BOT ---
 bot.run(TOKEN)
-
-
-
-
-
-
-
-
-
-
-
-
