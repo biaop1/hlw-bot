@@ -16,7 +16,7 @@ intents.members = True  # needed for role assignment
 # --- BOT INSTANCE ---
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-posted_games = {}  # game_id -> message
+posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp}
 
 # --- ROLE ASSIGNMENT ---
 @bot.event
@@ -58,6 +58,7 @@ async def fetch_games():
                 active_ids = set()
 
                 if len(games) == 0:
+                    print("No games found in API response")
                     return
 
                 for game in games:
@@ -71,6 +72,11 @@ async def fetch_games():
                     slotsTaken = game.get("slotsTaken", 0)
                     slotsTotal = game.get("slotsTotal", 0)
 
+                    # Log API uptime for debugging
+                    uptime_sec_api = game.get("uptime", 0)
+                    minutes_api, seconds_api = divmod(int(uptime_sec_api), 60)
+                    print(f"Game ID: {game_id}, Name: {name}, API Uptime: {minutes_api}m {seconds_api}s ({uptime_sec_api} seconds)")
+
                     # Criteria
                     if (
                         ("hlw" in name.lower()
@@ -80,10 +86,14 @@ async def fetch_games():
                          or "heroline" in map_name.lower())
                         and "w8." not in map_name.lower()
                     ):
-                        # Uptime
-                        uptime_sec = game.get("uptime", 0)
-                        minutes, seconds = divmod(int(uptime_sec), 60)
+                        # Calculate uptime locally
+                        current_time = time.time()
+                        if game_id not in posted_games:
+                            posted_games[game_id] = {"message": None, "start_time": current_time}
+                        uptime_sec_local = int(current_time - posted_games[game_id]["start_time"])
+                        minutes, seconds = divmod(uptime_sec_local, 60)
                         uptime_text = f"{minutes}m {seconds}s"
+                        print(f"Game ID: {game_id}, Name: {name}, Local Uptime: {uptime_text} ({uptime_sec_local} seconds)")
 
                         # Build embed
                         embed = discord.Embed(
@@ -101,45 +111,44 @@ async def fetch_games():
                             print("❌ Could not find channel!")
                             return
 
-                        if game_id not in posted_games:
+                        if posted_games[game_id]["message"] is None:
                             # Send new message
                             msg = await channel.send(embed=embed)
-                            posted_games[game_id] = msg
+                            posted_games[game_id]["message"] = msg
                         else:
                             # Update existing message
-                            msg = posted_games[game_id]
+                            msg = posted_games[game_id]["message"]
                             try:
                                 await msg.edit(embed=embed)
                             except Exception as e:
                                 print(f"❌ Failed to edit message for {game_id}: {e}")
 
-                # Handle games that disappeared (Closed)
-                for game_id in list(posted_games.keys()):
-                    if game_id not in active_ids:
-                        msg = posted_games[game_id]
-                        if msg:
-                            try:
-                                # Get the current embed
-                                current_embed = msg.embeds[0]
-                                # Create a new embed to preserve fields
-                                closed_embed = discord.Embed(
-                                    title=current_embed.title,
-                                    color=discord.Color.red()  # Change color to indicate closed
-                                )
-                                # Copy all fields from the current embed
-                                for field in current_embed.fields:
-                                    closed_embed.add_field(
-                                        name=field.name, value=field.value, inline=field.inline
-                                    )
-                                # Get the current uptime from the footer
-                                current_uptime = current_embed.footer.text.replace("Uptime: ", "")
-                                # Set footer with "Closed" in italics and frozen uptime
-                                closed_embed.set_footer(text=f"*Closed* {current_uptime}")
-                                await msg.edit(embed=closed_embed)
-                                # Remove the game from tracking
-                                posted_games.pop(game_id, None)
-                            except Exception as e:
-                                print(f"❌ Failed to mark game closed {game_id}: {e}")
+                            # Handle games that disappeared (Closed)
+                            for game_id in list(posted_games.keys()):
+                                if game_id not in active_ids:
+                                    msg = posted_games[game_id]["message"]
+                                    if msg:
+                                        try:
+                                            # Get the current embed
+                                            current_embed = msg.embeds[0]
+                                            # Create a new embed to preserve fields
+                                            closed_embed = discord.Embed(
+                                                title=current_embed.title,
+                                            )
+                                            # Copy existing fields except the footer
+                                            for field in current_embed.fields:
+                                                closed_embed.add_field(
+                                                    name=field.name, value=field.value, inline=field.inline
+                                                )
+                                            # Get the current uptime from the footer
+                                            current_uptime = current_embed.footer.text.replace("Uptime: ", "").replace(" *Closed*", "")
+                                            # Add uptime and closed status as inline fields
+                                            closed_embed.add_field(name="Uptime", value=current_uptime, inline=True)
+                                            closed_embed.add_field(name="Status", value="*Closed*", inline=True)
+                                            # Remove the game from tracking
+                                            posted_games.pop(game_id, None)
+                                        except Exception as e:
+                                            print(f"❌ Failed to mark game closed {game_id}: {e}")
 
 # --- RUN BOT ---
 bot.run(TOKEN)
