@@ -125,30 +125,45 @@ async def fetch_games():
 
                             # Handle games that disappeared (Closed)
                             for game_id in list(posted_games.keys()):
-                                if game_id not in active_ids:
+                                if game_id not in active_ids and not posted_games[game_id].get("closed", False):
                                     msg = posted_games[game_id]["message"]
-                                    if msg:
-                                        try:
-                                            # Get the current embed
-                                            current_embed = msg.embeds[0]
-                                            # Create a new embed to preserve fields
-                                            closed_embed = discord.Embed(
-                                                title=current_embed.title,
+                                    if not msg or not msg.embeds:
+                                        posted_games.pop(game_id)
+                                        continue
+                                    try:
+                                        current_embed = msg.embeds[0]
+
+                                        # Create a new embed with the same color and title
+                                        closed_embed = discord.Embed(
+                                            title=current_embed.title,
+                                            color=current_embed.color  # keep original color
+                                        )
+
+                                        # Copy all fields
+                                        for field in current_embed.fields:
+                                            closed_embed.add_field(
+                                                name=field.name,
+                                                value=field.value,
+                                                inline=field.inline
                                             )
-                                            # Copy existing fields except the footer
-                                            for field in current_embed.fields:
-                                                closed_embed.add_field(
-                                                    name=field.name, value=field.value, inline=field.inline
-                                                )
-                                            # Get the current uptime from the footer
-                                            current_uptime = current_embed.footer.text.replace("Uptime: ", "").replace(" *Closed*", "")
-                                            # Add uptime and closed status as inline fields
-                                            closed_embed.add_field(name="Uptime", value=current_uptime, inline=True)
-                                            closed_embed.add_field(name="Status", value="*Closed*", inline=True)
-                                            # Remove the game from tracking
-                                            posted_games.pop(game_id, None)
-                                        except Exception as e:
-                                            print(f"❌ Failed to mark game closed {game_id}: {e}")
+
+                                        # Freeze uptime
+                                        current_uptime = current_embed.footer.text or "0m 0s"
+                                        # Remove any previous *Closed* just in case
+                                        current_uptime = current_uptime.replace(" *Closed*", "")
+                                        closed_embed.set_footer(text=f"{current_uptime} *Closed*")
+
+                                        # Edit the message
+                                        await msg.edit(embed=closed_embed)
+
+                                        # Mark as closed so we don't try again
+                                        posted_games[game_id]["closed"] = True
+
+                                        print(f"Marked game {game_id} as Closed (uptime frozen)")
+
+                                    except Exception as e:
+                                        print(f"❌ Failed to mark game closed {game_id}: {e}")
+
 
 # --- RUN BOT ---
 bot.run(TOKEN)
