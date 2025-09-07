@@ -92,14 +92,15 @@ async def fetch_games():
                             "message": None,
                             "start_time": current_time,
                             "closed": False,
-                            "frozen_uptime": "0m 0s"
+                            "frozen_uptime": None
                         }
 
-                    # Determine uptime
+                    # Only calculate uptime if the game is not closed
                     if not posted_games[game_id]["closed"]:
-                        uptime_sec_local = int(current_time - posted_games[game_id]["start_time"])
-                        minutes, seconds = divmod(uptime_sec_local, 60)
+                        uptime_sec = int(current_time - posted_games[game_id]["start_time"])
+                        minutes, seconds = divmod(uptime_sec, 60)
                         uptime_text = f"{minutes}m {seconds}s"
+                        posted_games[game_id]["frozen_uptime"] = uptime_text
                     else:
                         uptime_text = posted_games[game_id]["frozen_uptime"]
 
@@ -110,14 +111,8 @@ async def fetch_games():
                     embed.add_field(name="Realm", value=server, inline=True)
                     embed.add_field(name="Players", value=f"{slotsTaken}/{slotsTotal}", inline=True)
                     embed.add_field(name="Uptime", value=uptime_text, inline=True)
+                    embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
 
-                    # Add *Closed* field if needed
-                    if posted_games[game_id]["closed"]:
-                        embed.add_field(name="\u200b", value="*Closed*", inline=True)
-                    else:
-                        embed.add_field(name="\u200b", value="\u200b", inline=True)
-
-                    # Send or update message
                     msg = posted_games[game_id]["message"]
                     if msg is None:
                         msg = await channel.send(embed=embed)
@@ -137,38 +132,29 @@ async def fetch_games():
                     try:
                         current_embed = msg.embeds[0]
 
-                        # Freeze the uptime from the last active update
-                        frozen_uptime = posted_games[game_id].get("frozen_uptime")
-                        if not frozen_uptime:
-                            # If somehow missing, calculate from start_time
-                            uptime_sec = int(time.time() - posted_games[game_id]["start_time"])
-                            minutes, seconds = divmod(uptime_sec, 60)
-                            frozen_uptime = f"{minutes}m {seconds}s"
-                            posted_games[game_id]["frozen_uptime"] = frozen_uptime
+                        # Freeze uptime exactly now
+                        current_time = time.time()
+                        uptime_sec = int(current_time - posted_games[game_id]["start_time"])
+                        minutes, seconds = divmod(uptime_sec, 60)
+                        frozen_uptime = f"{minutes}m {seconds}s"
+                        posted_games[game_id]["frozen_uptime"] = frozen_uptime
 
-                        # Create new embed, preserving color and fields
-                        closed_embed = discord.Embed(
-                            title=current_embed.title,
-                            color=current_embed.color
-                        )
+                        # Copy embed
+                        closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
                         for field in current_embed.fields:
                             closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
-                        # Update the Uptime field in place to append *Closed*
+                        # Replace Uptime field in place
                         for i, field in enumerate(closed_embed.fields):
                             if field.name == "Uptime":
                                 closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} *Closed*", inline=True)
                                 break
 
                         await msg.edit(embed=closed_embed)
-
-                        # Mark as closed
                         posted_games[game_id]["closed"] = True
-                        print(f"Marked game {game_id} as Closed with uptime frozen: {frozen_uptime}")
+                        print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}")
 
                     except Exception as e:
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
-
-
 # --- RUN BOT ---
 bot.run(TOKEN)
