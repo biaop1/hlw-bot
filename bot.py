@@ -147,7 +147,7 @@ async def fetch_games():
                         # Replace Uptime field in place
                         for i, field in enumerate(closed_embed.fields):
                             if field.name == "Uptime":
-                                closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} *Closed*", inline=True)
+                                closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} - *Closed*", inline=True)
                                 break
 
                         await msg.edit(embed=closed_embed)
@@ -158,3 +158,4 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
