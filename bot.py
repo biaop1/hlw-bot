@@ -109,6 +109,7 @@ async def fetch_games():
                             msg = await channel.send(embed=embed)
                             posted_games[game_id] = msg
                         else:
+                            
                             # Update existing message
                             msg = posted_games[game_id]
                             try:
@@ -141,3 +142,4 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
