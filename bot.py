@@ -45,7 +45,7 @@ async def on_ready():
 
     fetch_games.start()
 
-
+# --- GAME FETCH LOOP ---
 @tasks.loop(seconds=10)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
@@ -126,32 +126,32 @@ async def fetch_games():
                         except Exception as e:
                             print(f"❌ Failed to edit message for {game_id}: {e}")
 
-            # Mark disappeared games as closed and freeze uptime
-            for game_id in list(posted_games.keys()):
-                if game_id not in active_ids and not posted_games[game_id]["closed"]:
-                    msg = posted_games[game_id]["message"]
-                    if not msg or not msg.embeds:
-                        continue
-                    try:
-                        current_embed = msg.embeds[0]
+                        # Mark disappeared games as closed and freeze uptime
+                        for game_id in list(posted_games.keys()):
+                            if game_id not in active_ids and not posted_games[game_id]["closed"]:
+                                msg = posted_games[game_id]["message"]
+                                if not msg or not msg.embeds:
+                                    continue
+                                try:
+                                    current_embed = msg.embeds[0]
 
-                        closed_embed = discord.Embed(
-                            title=current_embed.title,
-                            color=current_embed.color  # keep original color
-                        )
+                                    closed_embed = discord.Embed(
+                                        title=current_embed.title,
+                                        color=current_embed.color  # keep original color
+                                    )
 
-                        # Copy fields
-                        for field in current_embed.fields:
-                            closed_embed.add_field(
-                                name=field.name,
-                                value=field.value,
-                                inline=field.inline
-                            )
+                                    # Copy fields
+                                    for field in current_embed.fields:
+                                        closed_embed.add_field(
+                                            name=field.name,
+                                            value=field.value,
+                                            inline=field.inline
+                                        )
 
                         # Freeze uptime and append *Closed*
                         current_uptime = current_embed.footer.text or "0m 0s"
                         current_uptime = current_uptime.replace("Uptime: ", "").replace(" *Closed*", "")
-                        #closed_embed.set_footer(text=f"{current_uptime} *Closed*")
+                        ##closed_embed.set_footer(text=f"{current_uptime} *Closed*")
                         embed.add_field(name="Uptime", value=uptime_text, inline=True)
                         if posted_games[game_id]["closed"]:
                             embed.add_field(name="\u200b", value="*Closed*", inline=True)  # \u200b is a zero-width space to keep it blank
@@ -168,3 +168,7 @@ async def fetch_games():
 
                     except Exception as e:
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
+
+
+# --- RUN BOT ---
+bot.run(TOKEN)
