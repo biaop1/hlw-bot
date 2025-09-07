@@ -137,7 +137,7 @@ async def fetch_games():
                     try:
                         current_embed = msg.embeds[0]
 
-                        # Copy fields into a new embed to preserve color
+                        # Copy fields into a new embed, preserving everything
                         closed_embed = discord.Embed(
                             title=current_embed.title,
                             color=current_embed.color
@@ -149,20 +149,24 @@ async def fetch_games():
                                 inline=field.inline
                             )
 
-                        # Freeze uptime and add *Closed* in italics
-                        current_uptime = current_embed.footer.text or "0m 0s"
-                        current_uptime = current_uptime.replace("Uptime: ", "").replace(" *Closed*", "")
-                        closed_embed.add_field(name="Uptime", value=current_uptime, inline=True)
-                        closed_embed.add_field(name="\u200b", value="*Closed*", inline=True)
+                        # Freeze uptime and append *Closed*
+                        # Here we look for the Uptime field to freeze its value
+                        frozen_uptime = None
+                        for i, field in enumerate(closed_embed.fields):
+                            if field.name == "Uptime":
+                                frozen_uptime = field.value
+                                closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} *Closed*", inline=True)
+                                break
+
+                        # Store frozen uptime in tracking
+                        posted_games[game_id]["closed"] = True
+                        posted_games[game_id]["frozen_uptime"] = frozen_uptime
 
                         await msg.edit(embed=closed_embed)
-
-                        # Update tracking
-                        posted_games[game_id]["closed"] = True
-                        posted_games[game_id]["frozen_uptime"] = current_uptime
                         print(f"Marked game {game_id} as Closed with uptime frozen.")
 
                     except Exception as e:
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
+
 # --- RUN BOT ---
 bot.run(TOKEN)
