@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 import aiohttp
 import os
 import time
+import datetime
 
 start_time = time.time()  # record when the bot started
 TOKEN = os.getenv("bot_token")
@@ -18,8 +19,7 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "closed": bool, "frozen_uptime": str}
 
-
-# --- ROLE ASSIGNMENT ---
+# --- ROLE ASSIGNMENT --- Assign "member" on new member join. Retired module. Replaced by carl-bot
 #@bot.event
 #async def on_member_join(member):
 #    role_name = "Member"
@@ -29,6 +29,64 @@ posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "close
 #        print(f"Assigned role '{role_name}' to {member.name}")
 #    else:
 #        print(f"Role '{role_name}' not found in {member.guild.name}")
+
+# --- ROLE UPGRADE CONFIG --- Upgrade role Member (Peon) to Member (Grunt)
+ROLE_X_ID = 1414518023636914278  # Existing role to track
+ROLE_Y_ID = 1413169885663727676  # Role to assign after threshold
+DAYS_THRESHOLD = 7              # Days before upgrade
+
+role_x_assignment = {}  # Tracks when Role X was assigned
+
+# Track when Role X is assigned to a member
+@bot.event
+async def on_member_update(before, after):
+    before_roles = {r.id for r in before.roles}
+    after_roles = {r.id for r in after.roles}
+    
+    # Role X newly added
+    if ROLE_X_ID not in before_roles and ROLE_X_ID in after_roles:
+        role_x_assignment[after.id] = datetime.datetime.utcnow()
+
+# Daily loop to upgrade roles
+@tasks.loop(hours=24)
+async def upgrade_roles():
+    guild = bot.get_guild(YOUR_GUILD_ID)  # Replace with your server ID
+    if not guild:
+        return
+    role_x = discord.Object(id=ROLE_X_ID)
+    role_y = discord.Object(id=ROLE_Y_ID)
+
+    for member in guild.members:
+        if member.bot:
+            continue
+
+        # Only proceed if member has Role X
+        if role_x.id not in [r.id for r in member.roles]:
+            continue
+
+        # Determine when they got Role X
+        assigned_at = role_x_assignment.get(member.id)
+        if not assigned_at:
+            # fallback if we didn't track it: use join date
+            assigned_at = member.joined_at
+
+        days_with_role_x = (datetime.datetime.utcnow() - assigned_at).days
+
+        if days_with_role_x >= DAYS_THRESHOLD:
+            try:
+                await member.remove_roles(role_x)
+                await member.add_roles(role_y)
+                role_x_assignment.pop(member.id, None)
+                print(f"Upgraded {member.display_name} from Role X to Role Y")
+            except Exception as e:
+                print(f"❌ Failed to upgrade {member.display_name}: {e}")
+
+# Start the role upgrade loop when the bot is ready
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+    fetch_games.start()
+    upgrade_roles.start()  # Start role upgrade loop
 
 
 # --- READY EVENT ---
@@ -46,9 +104,8 @@ async def on_ready():
     fetch_games.start()
 
 
-
 # --- GAME FETCH LOOP ---
-@tasks.loop(seconds=10)
+@tasks.loop(seconds=9)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
@@ -158,5 +215,6 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
