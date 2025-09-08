@@ -33,7 +33,7 @@ posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "close
 # --- ROLE UPGRADE CONFIG --- Upgrade role Member (Peon) to Member (Grunt)
 ROLE_X_ID = 1414518023636914278  # Existing role to track
 ROLE_Y_ID = 1413169885663727676  # Role to assign after threshold
-UPGRADE_MINUTES = 3              # Days before upgrade
+DAYS_THRESHOLD = 7               # Days before upgrade
 
 role_x_assignment = {}  # Tracks when Role X was assigned
 
@@ -48,7 +48,7 @@ async def on_member_update(before, after):
         role_x_assignment[after.id] = datetime.datetime.utcnow()
 
 # Daily loop to upgrade roles
-@tasks.loop(seconds=30)
+@tasks.loop(hours=12)
 async def upgrade_roles():
     GUILD_ID = 1412713066495217797  # replace with your guild ID
     guild = bot.get_guild(GUILD_ID)
@@ -70,7 +70,7 @@ async def upgrade_roles():
         assigned_at = role_x_assignment.get(member.id) or member.joined_at
         minutes_with_role_x = (datetime.datetime.utcnow() - assigned_at).total_seconds() / 60
 
-        if minutes_with_role_x >= UPGRADE_MINUTES:
+        if minutes_with_role_x >= DAYS_THRESHOLD:
             try:
                 await member.remove_roles(role_x)
                 await member.add_roles(role_y)
@@ -207,6 +207,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
