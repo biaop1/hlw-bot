@@ -20,15 +20,15 @@ posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "close
 
 
 # --- ROLE ASSIGNMENT ---
-@bot.event
-async def on_member_join(member):
-    role_name = "Member"
-    role = discord.utils.get(member.guild.roles, name=role_name)
-    if role:
-        await member.add_roles(role)
-        print(f"Assigned role '{role_name}' to {member.name}")
-    else:
-        print(f"Role '{role_name}' not found in {member.guild.name}")
+#@bot.event
+#async def on_member_join(member):
+#    role_name = "Member"
+#    role = discord.utils.get(member.guild.roles, name=role_name)
+#    if role:
+#        await member.add_roles(role)
+#        print(f"Assigned role '{role_name}' to {member.name}")
+#    else:
+#        print(f"Role '{role_name}' not found in {member.guild.name}")
 
 
 # --- READY EVENT ---
@@ -158,4 +158,5 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
