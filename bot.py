@@ -48,7 +48,7 @@ async def on_member_update(before, after):
         role_x_assignment[after.id] = datetime.datetime.utcnow()
 
 # Daily loop to upgrade roles
-@tasks.loop(hours=24)
+@tasks.loop(minutes=3)
 async def upgrade_roles():
     guild = bot.get_guild(YOUR_GUILD_ID)  # Replace with your server ID
     if not guild:
@@ -215,6 +215,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
