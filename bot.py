@@ -96,6 +96,7 @@ async def on_ready():
     fetch_games.start()
     upgrade_roles.start()  # Start role upgrade loop
 
+
 # --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
 async def fetch_games():
@@ -141,7 +142,8 @@ async def fetch_games():
                             "message": None,
                             "start_time": current_time,
                             "closed": False,
-                            "frozen_uptime": None
+                            "frozen_uptime": None,
+                            "last_slots": None   # <--- track last good slot count
                         }
 
                     # Only calculate uptime if the game is not closed
@@ -153,12 +155,22 @@ async def fetch_games():
                     else:
                         uptime_text = posted_games[game_id]["frozen_uptime"]
 
+                    # --- PATCH: Ignore bogus 0/1 slot counts ---
+                    last_seen = posted_games[game_id]["last_slots"]
+                    if slotsTaken > 1:
+                        slots_text = f"{slotsTaken}/{slotsTotal}"
+                        posted_games[game_id]["last_slots"] = slots_text
+                    elif last_seen:
+                        slots_text = last_seen
+                    else:
+                        slots_text = f"{slotsTaken}/{slotsTotal}"
+
                     # Build embed
                     embed = discord.Embed(title=name, color=discord.Color.green())
                     embed.add_field(name="Map", value=map_name, inline=False)
                     embed.add_field(name="Host", value=host, inline=True)
                     embed.add_field(name="Realm", value=server, inline=True)
-                    embed.add_field(name="Players", value=f"{slotsTaken}/{slotsTotal}", inline=True)
+                    embed.add_field(name="Players", value=slots_text, inline=True)  # <--- patched here
                     embed.add_field(name="Uptime", value=uptime_text, inline=True)
                     embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
 
@@ -207,6 +219,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
