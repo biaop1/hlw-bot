@@ -48,13 +48,18 @@ async def on_member_update(before, after):
         role_x_assignment[after.id] = datetime.datetime.utcnow()
 
 # Daily loop to upgrade roles
-@tasks.loop(seconds=30)  # check every 30 seconds
+@tasks.loop(seconds=30)
 async def upgrade_roles():
-    guild = bot.get_guild(YOUR_GUILD_ID)
+    GUILD_ID = 1412713066495217797  # replace with your guild ID
+    guild = bot.get_guild(GUILD_ID)
     if not guild:
         return
-    role_x = discord.Object(id=ROLE_X_ID)
-    role_y = discord.Object(id=ROLE_Y_ID)
+
+    role_x = guild.get_role(ROLE_X_ID)
+    role_y = guild.get_role(ROLE_Y_ID)
+    if not role_x or not role_y:
+        print("Roles not found in guild")
+        return
 
     for member in guild.members:
         if member.bot:
@@ -74,12 +79,6 @@ async def upgrade_roles():
             except Exception as e:
                 print(f"❌ Failed to upgrade {member.display_name}: {e}")
 
-# Start the role upgrade loop when the bot is ready
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-    fetch_games.start()
-    upgrade_roles.start()  # Start role upgrade loop
 
 
 # --- READY EVENT ---
@@ -95,7 +94,7 @@ async def on_ready():
         print(f"❌ Failed to update avatar: {e}")
 
     fetch_games.start()
-
+    upgrade_roles.start()  # Start role upgrade loop
 
 # --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
@@ -208,6 +207,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
