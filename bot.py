@@ -69,9 +69,10 @@ async def upgrade_roles():
             continue
 
         assigned_at = role_x_assignment.get(member.id) or member.joined_at
-        minutes_with_role_x = (datetime.datetime.now(datetime.UTC) - assigned_at).total_seconds() / 60
-
-        if minutes_with_role_x >= DAYS_THRESHOLD:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        days_with_role_x = (now - assigned_at).total_seconds() / 86400  # convert seconds to days
+        
+        if days_with_role_x >= DAYS_THRESHOLD:
             try:
                 await member.remove_roles(role_x)
                 await member.add_roles(role_y)
@@ -220,6 +221,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
