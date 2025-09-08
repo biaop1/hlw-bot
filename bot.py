@@ -33,7 +33,7 @@ posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "close
 # --- ROLE UPGRADE CONFIG --- Upgrade role Member (Peon) to Member (Grunt)
 ROLE_X_ID = 1414518023636914278  # Existing role to track
 ROLE_Y_ID = 1413169885663727676  # Role to assign after threshold
-DAYS_THRESHOLD = 7              # Days before upgrade
+UPGRADE_MINUTES = 3              # Days before upgrade
 
 role_x_assignment = {}  # Tracks when Role X was assigned
 
@@ -48,9 +48,9 @@ async def on_member_update(before, after):
         role_x_assignment[after.id] = datetime.datetime.utcnow()
 
 # Daily loop to upgrade roles
-@tasks.loop(minutes=3)
+@tasks.loop(seconds=30)  # check every 30 seconds
 async def upgrade_roles():
-    guild = bot.get_guild(YOUR_GUILD_ID)  # Replace with your server ID
+    guild = bot.get_guild(YOUR_GUILD_ID)
     if not guild:
         return
     role_x = discord.Object(id=ROLE_X_ID)
@@ -59,20 +59,13 @@ async def upgrade_roles():
     for member in guild.members:
         if member.bot:
             continue
-
-        # Only proceed if member has Role X
         if role_x.id not in [r.id for r in member.roles]:
             continue
 
-        # Determine when they got Role X
-        assigned_at = role_x_assignment.get(member.id)
-        if not assigned_at:
-            # fallback if we didn't track it: use join date
-            assigned_at = member.joined_at
+        assigned_at = role_x_assignment.get(member.id) or member.joined_at
+        minutes_with_role_x = (datetime.datetime.utcnow() - assigned_at).total_seconds() / 60
 
-        days_with_role_x = (datetime.datetime.utcnow() - assigned_at).days
-
-        if days_with_role_x >= DAYS_THRESHOLD:
+        if minutes_with_role_x >= UPGRADE_MINUTES:
             try:
                 await member.remove_roles(role_x)
                 await member.add_roles(role_y)
@@ -215,6 +208,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
