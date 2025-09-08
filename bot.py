@@ -5,6 +5,7 @@ import os
 import time
 import datetime
 
+
 start_time = time.time()  # record when the bot started
 TOKEN = os.getenv("bot_token")
 CHANNEL_ID = 1412772946845634642
@@ -45,7 +46,7 @@ async def on_member_update(before, after):
     
     # Role X newly added
     if ROLE_X_ID not in before_roles and ROLE_X_ID in after_roles:
-        role_x_assignment[after.id] = datetime.datetime.utcnow()
+        role_x_assignment[after.id] = datetime.datetime.now(datetime.UTC)
 
 # Daily loop to upgrade roles
 @tasks.loop(hours=12)
@@ -68,7 +69,7 @@ async def upgrade_roles():
             continue
 
         assigned_at = role_x_assignment.get(member.id) or member.joined_at
-        minutes_with_role_x = (datetime.datetime.utcnow() - assigned_at).total_seconds() / 60
+        minutes_with_role_x = (datetime.datetime.now(datetime.UTC) - assigned_at).total_seconds() / 60
 
         if minutes_with_role_x >= DAYS_THRESHOLD:
             try:
@@ -219,6 +220,7 @@ async def fetch_games():
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
