@@ -149,6 +149,13 @@ async def fetch_games():
             minutes, seconds = divmod(int(api_uptime), 60)
             uptime_text = f"{minutes}m {seconds}s"
             
+
+            # --- Uptime from API instead of manual timer ---
+            uptime_sec = int(game.get("uptime", 0))
+            minutes, seconds = divmod(uptime_sec, 60)
+            uptime_text = f"{minutes}m {seconds}s"
+            
+            # Store frozen uptime only when needed
             if not posted_games[game_id]["closed"]:
                 posted_games[game_id]["frozen_uptime"] = uptime_text
             else:
@@ -248,5 +255,6 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
