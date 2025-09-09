@@ -234,12 +234,13 @@ async def fetch_games():
     except Exception as e:
         print(f"❌ Fetch games loop broad error: {e}")
 
-@tasks.error(fetch_games)
-async def fetch_error(exc):
-    print(f"❌ Fetch games task error: {exc}")
+@fetch_games.error
+async def fetch_games_error(exception):
+    print(f"❌ Error in fetch_games: {exception}")
 
 # --- RUN BOT ---
 fetch_games.start()
 upgrade_roles.start()
 bot.run(TOKEN)
+
 
