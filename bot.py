@@ -77,9 +77,9 @@ async def upgrade_roles():
             except Exception as e:
                 print(f"❌ Failed to upgrade {member.display_name}: {e}")
 
-@tasks.error(upgrade_roles)
-async def upgrade_error(exc):
-    print(f"❌ Upgrade roles task error: {exc}")
+@upgrade_roles.error
+async def upgrade_roles_error(exception):
+    print(f"❌ Error in upgrade_roles: {exception}")
 
 # --- READY EVENT ---
 @bot.event
@@ -242,3 +242,4 @@ async def fetch_error(exc):
 fetch_games.start()
 upgrade_roles.start()
 bot.run(TOKEN)
+
