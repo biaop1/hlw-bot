@@ -154,14 +154,36 @@ async def fetch_games():
                 uptime_text = posted_games[game_id]["frozen_uptime"]
 
             # --- PATCH: ignore bogus 0/1 slot counts
+            # --- Improved slot count handling ---
             last_seen = posted_games[game_id]["last_slots"]
+            
             if slotsTaken > 1:
+                # Normal case: update with fresh value
                 slots_text = f"{slotsTaken}/{slotsTotal}"
                 posted_games[game_id]["last_slots"] = slots_text
-            elif last_seen:
-                slots_text = last_seen
+            
+            elif slotsTaken <= 1:
+                # Possible bogus value from API
+                if last_seen:
+                    # Count how many times in a row we’ve seen "1"
+                    counter = posted_games[game_id].get("low_count_streak", 0) + 1
+                    posted_games[game_id]["low_count_streak"] = counter
+            
+                    if counter >= 2:
+                        # Accept it as real if we’ve seen 1/12 twice in a row
+                        slots_text = f"{slotsTaken}/{slotsTotal}"
+                        posted_games[game_id]["last_slots"] = slots_text
+                    else:
+                        # Keep last good value
+                        slots_text = last_seen
+                else:
+                    # First time seeing it, no history → just use it
+                    slots_text = f"{slotsTaken}/{slotsTotal}"
+                    posted_games[game_id]["last_slots"] = slots_text
             else:
                 slots_text = f"{slotsTaken}/{slotsTotal}"
+                posted_games[game_id]["last_slots"] = slots_text
+
 
 
             embed = discord.Embed(title=name, color=discord.Color.green())
@@ -225,3 +247,4 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
