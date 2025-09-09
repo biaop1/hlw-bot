@@ -145,10 +145,11 @@ async def fetch_games():
                     "missing_since": None
                 }
 
+            api_uptime = game.get("uptime", 0)  # seconds from API
+            minutes, seconds = divmod(int(api_uptime), 60)
+            uptime_text = f"{minutes}m {seconds}s"
+            
             if not posted_games[game_id]["closed"]:
-                uptime_sec = int(current_time - posted_games[game_id]["start_time"])
-                minutes, seconds = divmod(uptime_sec, 60)
-                uptime_text = f"{minutes}m {seconds}s"
                 posted_games[game_id]["frozen_uptime"] = uptime_text
             else:
                 uptime_text = posted_games[game_id]["frozen_uptime"]
@@ -247,4 +248,5 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
