@@ -128,6 +128,7 @@ async def fetch_games():
         server = game.get("server", "")
         slotsTaken = game.get("slotsTaken", 0)
         slotsTotal = game.get("slotsTotal", 0)
+        lastUpdated = game.get("lastUpdated", 0)  # Unix timestamp from API
 
         # --- Fix #2: regex-based HLW detection
         if HLW_REGEX.search(name) or HLW_REGEX.search(map_name):
@@ -141,9 +142,19 @@ async def fetch_games():
                     "start_time": current_time,
                     "closed": False,
                     "frozen_uptime": None,
-                    "last_slots": None,
+                    "last_slots_text": None,
+                    "last_valid_slots_taken": None,
+                    "last_valid_slots_total": None,
+                    "last_valid_updated": 0,  # Track timestamp of last valid update
                     "missing_since": None
                 }
+
+            # Update slots only if lastUpdated is newer and slotsTaken is reasonable
+            if slotsTaken >= 1 and lastUpdated > posted_games[game_id]["last_valid_updated"]:
+                posted_games[game_id]["last_valid_slots_taken"] = slotsTaken
+                posted_games[game_id]["last_valid_slots_total"] = slotsTotal
+                posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+                posted_games[game_id]["last_valid_updated"] = lastUpdated
 
             if not posted_games[game_id]["closed"]:
                 uptime_sec = int(current_time - posted_games[game_id]["start_time"])
@@ -153,38 +164,12 @@ async def fetch_games():
             else:
                 uptime_text = posted_games[game_id]["frozen_uptime"]
 
-            # --- PATCH: ignore bogus 0/1 slot counts
-            # --- Improved slot count handling ---
-            last_seen = posted_games[game_id]["last_slots"]
-            
-            if slotsTaken > 1:
-                # Normal case: update with fresh value
-                slots_text = f"{slotsTaken}/{slotsTotal}"
-                posted_games[game_id]["last_slots"] = slots_text
-            
-            elif slotsTaken <= 1:
-                # Possible bogus value from API
-                if last_seen:
-                    # Count how many times in a row we’ve seen "1"
-                    counter = posted_games[game_id].get("low_count_streak", 0) + 1
-                    posted_games[game_id]["low_count_streak"] = counter
-            
-                    if counter >= 2:
-                        # Accept it as real if we’ve seen 1/12 twice in a row
-                        slots_text = f"{slotsTaken}/{slotsTotal}"
-                        posted_games[game_id]["last_slots"] = slots_text
-                    else:
-                        # Keep last good value
-                        slots_text = last_seen
-                else:
-                    # First time seeing it, no history → just use it
-                    slots_text = f"{slotsTaken}/{slotsTotal}"
-                    posted_games[game_id]["last_slots"] = slots_text
-            else:
-                slots_text = f"{slotsTaken}/{slotsTotal}"
-                posted_games[game_id]["last_slots"] = slots_text
-
-
+            # Use last valid slots for display, fallback to current if none set
+            slots_text = (
+                posted_games[game_id]["last_slots_text"]
+                if posted_games[game_id]["last_slots_text"]
+                else f"{slotsTaken}/{slotsTotal}"
+            )
 
             embed = discord.Embed(title=name, color=discord.Color.green())
             embed.add_field(name="Map", value=map_name, inline=False)
@@ -204,7 +189,7 @@ async def fetch_games():
                 except Exception as e:
                     print(f"❌ Failed to edit message for {game_id}: {e}")
 
-            # reset missing_since if game is back
+            # Reset missing_since if game is back
             posted_games[game_id]["missing_since"] = None
 
     # --- Fix #3: Grace period before closing ---
@@ -213,7 +198,7 @@ async def fetch_games():
             if info["missing_since"] is None:
                 info["missing_since"] = time.time()
                 continue
-            elif time.time() - info["missing_since"] < 20:  # wait 20s before closing
+            elif time.time() - info["missing_since"] < 30:  # Increased to 30s
                 continue
 
             msg = info["message"]
@@ -223,18 +208,25 @@ async def fetch_games():
                 current_embed = msg.embeds[0]
                 frozen_uptime = info["frozen_uptime"]
 
+                # Use last valid slots for closed embed
+                slots_text = (
+                    info["last_slots_text"]
+                    if info["last_slots_text"]
+                    else f"{info['last_valid_slots_taken'] or 0}/{info['last_valid_slots_total'] or 0}"
+                )
+
                 closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
                 for field in current_embed.fields:
-                    closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
-
-                for i, field in enumerate(closed_embed.fields):
-                    if field.name == "Uptime":
-                        closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} - *Closed*", inline=True)
-                        break
+                    if field.name == "Players":
+                        closed_embed.add_field(name="Players", value=slots_text, inline=field.inline)
+                    elif field.name == "Uptime":
+                        closed_embed.add_field(name="Uptime", value=f"{frozen_uptime} - *Closed*", inline=field.inline)
+                    else:
+                        closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
                 await msg.edit(embed=closed_embed)
                 info["closed"] = True
-                print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}")
+                print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime} and slots {slots_text} (last_updated={info['last_valid_updated']})")
             except Exception as e:
                 print(f"❌ Failed to mark game closed {game_id}: {e}")
 
@@ -247,3 +239,4 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
