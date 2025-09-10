@@ -149,12 +149,28 @@ async def fetch_games():
                     "missing_since": None
                 }
 
-            # Update slots only if lastUpdated is newer and slotsTaken is reasonable
-            if slotsTaken >= 1 and lastUpdated > posted_games[game_id]["last_valid_updated"]:
-                posted_games[game_id]["last_valid_slots_taken"] = slotsTaken
-                posted_games[game_id]["last_valid_slots_total"] = slotsTotal
-                posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
-                posted_games[game_id]["last_valid_updated"] = lastUpdated
+
+            # --- Handle slotsTaken safely ---
+            if not posted_games[game_id]["closed"]:
+                # Update only if API timestamp is newer
+                if lastUpdated > posted_games[game_id]["last_valid_updated"]:
+                    if slotsTaken > 1:  
+                        # Valid update (at least 2 players)
+                        posted_games[game_id]["last_valid_slots_taken"] = slotsTaken
+                        posted_games[game_id]["last_valid_slots_total"] = slotsTotal
+                        posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+                        posted_games[game_id]["last_valid_updated"] = lastUpdated
+                    else:
+                        # Ignore 1/x blips → keep last known good slots
+                        if not posted_games[game_id]["last_slots_text"]:
+                            posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+            else:
+                # Game closed → freeze at last known good value
+                slotsTaken = posted_games[game_id]["last_valid_slots_taken"] or slotsTaken
+                slotsTotal = posted_games[game_id]["last_valid_slots_total"] or slotsTotal
+                if not posted_games[game_id]["last_slots_text"]:
+                    posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+
 
             if not posted_games[game_id]["closed"]:
                 uptime_sec = int(current_time - posted_games[game_id]["start_time"])
@@ -239,4 +255,5 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
