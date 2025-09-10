@@ -81,8 +81,13 @@ async def upgrade_roles():
 # --- READY EVENT ---
 @bot.event
 async def on_ready():
-    global session
-    print(f"Logged in as {bot.user}")
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+
+    # Start tasks safely
+    if not fetch_games.is_running():
+        fetch_games.start()
+    if not upgrade_roles.is_running():
+        upgrade_roles.start()
 
     # persistent session
     session = aiohttp.ClientSession()
@@ -98,6 +103,7 @@ async def on_ready():
     upgrade_roles.start()
 
 # --- GAME FETCH LOOP ---
+# --- GAME FETCH LOOP (REPLACEMENT) ---
 @tasks.loop(seconds=9)
 async def fetch_games():
     global session
@@ -128,94 +134,112 @@ async def fetch_games():
         server = game.get("server", "")
         slotsTaken = game.get("slotsTaken", 0)
         slotsTotal = game.get("slotsTotal", 0)
-        lastUpdated = game.get("lastUpdated", 0)  # Unix timestamp from API
+        lastUpdated = game.get("lastUpdated", 0)  # timestamp from API (may be 0/missing)
+        api_uptime = int(game.get("uptime", 0))   # uptime in seconds from API
 
-        # --- Fix #2: regex-based HLW detection
+        # HLW detection
         if HLW_REGEX.search(name) or HLW_REGEX.search(map_name):
             if "w8." in map_name.lower():
                 continue
 
             current_time = time.time()
+            # ensure we have an entry
             if game_id not in posted_games:
                 posted_games[game_id] = {
                     "message": None,
                     "start_time": current_time,
                     "closed": False,
                     "frozen_uptime": None,
-                    "last_slots_text": None,
-                    "last_valid_slots_taken": None,
-                    "last_valid_slots_total": None,
-                    "last_valid_updated": 0,  # Track timestamp of last valid update
-                    "missing_since": None
+                    "last_slots_text": None,            # formatted "10/12"
+                    "last_valid_slots_taken": None,     # numeric 10
+                    "last_valid_slots_total": None,     # numeric 12
+                    "last_valid_updated": 0,            # numeric timestamp
+                    "missing_since": None,
+                    "low_count_streak": 0,              # optional if needed later
                 }
 
+            info = posted_games[game_id]
 
-            # --- Handle slotsTaken safely ---
-            if not posted_games[game_id]["closed"]:
-                # Update only if API timestamp is newer
-                if lastUpdated > posted_games[game_id]["last_valid_updated"]:
-                    if slotsTaken >= 2:  
-                        # Valid update (at least 2 players, covers 2v2/FFA games)
-                        posted_games[game_id]["last_valid_slots_taken"] = slotsTaken
-                        posted_games[game_id]["last_valid_slots_total"] = slotsTotal
-                        posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
-                        posted_games[game_id]["last_valid_updated"] = lastUpdated
+            # --- Uptime: take from API (do not compute from bot start_time) ---
+            minutes, seconds = divmod(api_uptime, 60)
+            uptime_text = f"{minutes}m {seconds}s"
+            # keep frozen_uptime updated while still alive
+            if not info["closed"]:
+                info["frozen_uptime"] = uptime_text
+            else:
+                uptime_text = info["frozen_uptime"] or uptime_text
+
+            # --- Slots handling (avoid 0/0, avoid overwriting with bogus 0/1) ---
+            # Update last_valid only when API data looks sane:
+            # - If slotsTotal is a positive number and
+            #   * slotsTaken >= 2 -> definitely a valid update (covers typical games)
+            #   * OR last_valid is None and slotsTaken >= 1 -> accept first snapshot (handles 1v1 expressed as 2/12 per your note)
+            last_valid = info["last_valid_slots_taken"]
+            if slotsTotal and (slotsTaken >= 2 or (last_valid is None and slotsTaken >= 1)):
+                # accept this as last valid snapshot
+                info["last_valid_slots_taken"] = int(slotsTaken)
+                info["last_valid_slots_total"] = int(slotsTotal)
+                info["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+                # prefer API lastUpdated if present, else wall time
+                info["last_valid_updated"] = int(lastUpdated) if lastUpdated else int(time.time())
+            else:
+                # If this fetch is a 0/1 blip, do NOT overwrite last_slots_text.
+                # Keep whatever last_slots_text we have. If we have none AND slotsTotal present,
+                # fall back to current snapshot (but avoid storing 0/0).
+                if not info["last_slots_text"]:
+                    if slotsTotal and slotsTaken >= 1:
+                        # first meaningful snapshot (rare)
+                        info["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+                        info["last_valid_slots_taken"] = int(slotsTaken)
+                        info["last_valid_slots_total"] = int(slotsTotal)
+                        info["last_valid_updated"] = int(lastUpdated) if lastUpdated else int(time.time())
                     else:
-                        # Ignore 0/x and 1/x blips completely → do NOT overwrite last known good
-                        if not posted_games[game_id]["last_slots_text"]:
-                            # fallback only if nothing stored yet, but still keep "x/total" (not 0/0)
-                            posted_games[game_id]["last_slots_text"] = f"?/{slotsTotal or '?'}"
+                        # still no valid data -> leave last_slots_text None for now
+                        pass
+
+            # Decide what to display for Players
+            if info["last_slots_text"]:
+                slots_text = info["last_slots_text"]
             else:
-                # Game closed → freeze at last known good value
-                slotsTaken = posted_games[game_id]["last_valid_slots_taken"] or slotsTaken
-                slotsTotal = posted_games[game_id]["last_valid_slots_total"] or slotsTotal
-                if not posted_games[game_id]["last_slots_text"]:
-                    posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
-                    
+                # No last valid value yet; avoid 0/0 display
+                if slotsTotal:
+                    slots_text = f"{slotsTaken}/{slotsTotal}"
+                else:
+                    slots_text = "?/?"
 
-            if not posted_games[game_id]["closed"]:
-                uptime_sec = int(current_time - posted_games[game_id]["start_time"])
-                minutes, seconds = divmod(uptime_sec, 60)
-                uptime_text = f"{minutes}m {seconds}s"
-                posted_games[game_id]["frozen_uptime"] = uptime_text
-            else:
-                uptime_text = posted_games[game_id]["frozen_uptime"]
-
-            # Use last valid slots for display, fallback to current if none set
-            slots_text = (
-                posted_games[game_id]["last_slots_text"]
-                if posted_games[game_id]["last_slots_text"]
-                else f"{slotsTaken}/{slotsTotal}"
-            )
-
+            # Build embed
             embed = discord.Embed(title=name, color=discord.Color.green())
             embed.add_field(name="Map", value=map_name, inline=False)
             embed.add_field(name="Host", value=host, inline=True)
             embed.add_field(name="Realm", value=server, inline=True)
             embed.add_field(name="Players", value=slots_text, inline=True)
             embed.add_field(name="Uptime", value=uptime_text, inline=True)
-            embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
+            embed.add_field(name="\u200b", value="\u200b", inline=True if not info["closed"] else False)
 
-            msg = posted_games[game_id]["message"]
+            # Send or edit message
+            msg = info["message"]
             if msg is None:
-                msg = await channel.send(embed=embed)
-                posted_games[game_id]["message"] = msg
+                try:
+                    msg = await channel.send(embed=embed)
+                    info["message"] = msg
+                except Exception as e:
+                    print(f"❌ Failed to send message for {game_id}: {e}")
             else:
                 try:
                     await msg.edit(embed=embed)
                 except Exception as e:
                     print(f"❌ Failed to edit message for {game_id}: {e}")
 
-            # Reset missing_since if game is back
-            posted_games[game_id]["missing_since"] = None
+            # Reset missing_since if game came back
+            info["missing_since"] = None
 
-    # --- Fix #3: Grace period before closing ---
+    # --- Grace period before closing (unchanged logic, using last_slots_text if present) ---
     for game_id, info in list(posted_games.items()):
         if game_id not in active_ids and not info["closed"]:
             if info["missing_since"] is None:
                 info["missing_since"] = time.time()
                 continue
-            elif time.time() - info["missing_since"] < 30:  # Increased to 30s
+            elif time.time() - info["missing_since"] < 30:
                 continue
 
             msg = info["message"]
@@ -223,20 +247,28 @@ async def fetch_games():
                 continue
             try:
                 current_embed = msg.embeds[0]
-                frozen_uptime = info["frozen_uptime"]
-
-                # Use last valid slots for closed embed
-                slots_text = (
-                    info["last_slots_text"]
-                    if info["last_slots_text"]
-                    else f"{info['last_valid_slots_taken'] or 0}/{info['last_valid_slots_total'] or 0}"
+                frozen_uptime = info.get("frozen_uptime") or (
+                    # try to extract from embed footer/fields if not present
+                    next((f.value for f in current_embed.fields if f.name.lower() == "uptime"), "0m 0s")
                 )
 
-                closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
+                # Prefer last known good slots; otherwise, read Players from the current embed to avoid 0/0
+                slots_text = info.get("last_slots_text")
+                if not slots_text:
+                    # try to extract Players field from the existing embed
+                    for field in current_embed.fields:
+                        if field.name.lower() == "players":
+                            slots_text = field.value
+                            break
+                if not slots_text:
+                    slots_text = "?/?"  # ultimate fallback
+
+                # Build closed embed: copy fields but replace Players & Uptime
+                closed_embed = discord.Embed(title=current_embed.title, color=discord.Color.red())
                 for field in current_embed.fields:
-                    if field.name == "Players":
+                    if field.name.lower() == "players":
                         closed_embed.add_field(name="Players", value=slots_text, inline=field.inline)
-                    elif field.name == "Uptime":
+                    elif field.name.lower() == "uptime":
                         closed_embed.add_field(name="Uptime", value=f"{frozen_uptime} - *Closed*", inline=field.inline)
                     else:
                         closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
@@ -247,6 +279,7 @@ async def fetch_games():
             except Exception as e:
                 print(f"❌ Failed to mark game closed {game_id}: {e}")
 
+
 # --- CLEANUP SESSION ---
 @bot.event
 async def on_close():
@@ -256,6 +289,7 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
