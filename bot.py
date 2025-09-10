@@ -154,23 +154,24 @@ async def fetch_games():
             if not posted_games[game_id]["closed"]:
                 # Update only if API timestamp is newer
                 if lastUpdated > posted_games[game_id]["last_valid_updated"]:
-                    if slotsTaken > 1:  
-                        # Valid update (at least 2 players)
+                    if slotsTaken >= 2:  
+                        # Valid update (at least 2 players, covers 2v2/FFA games)
                         posted_games[game_id]["last_valid_slots_taken"] = slotsTaken
                         posted_games[game_id]["last_valid_slots_total"] = slotsTotal
                         posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
                         posted_games[game_id]["last_valid_updated"] = lastUpdated
                     else:
-                        # Ignore 1/x blips → keep last known good slots
+                        # Ignore 0/x and 1/x blips completely → do NOT overwrite last known good
                         if not posted_games[game_id]["last_slots_text"]:
-                            posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
+                            # fallback only if nothing stored yet, but still keep "x/total" (not 0/0)
+                            posted_games[game_id]["last_slots_text"] = f"?/{slotsTotal or '?'}"
             else:
                 # Game closed → freeze at last known good value
                 slotsTaken = posted_games[game_id]["last_valid_slots_taken"] or slotsTaken
                 slotsTotal = posted_games[game_id]["last_valid_slots_total"] or slotsTotal
                 if not posted_games[game_id]["last_slots_text"]:
                     posted_games[game_id]["last_slots_text"] = f"{slotsTaken}/{slotsTotal}"
-
+                    
 
             if not posted_games[game_id]["closed"]:
                 uptime_sec = int(current_time - posted_games[game_id]["start_time"])
@@ -255,5 +256,6 @@ async def on_close():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
