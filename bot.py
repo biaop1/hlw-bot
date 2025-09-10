@@ -98,6 +98,7 @@ async def on_ready():
     upgrade_roles.start()  # Start role upgrade loop
 
 # --- GAME FETCH LOOP ---
+# --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
 async def fetch_games():
     async with aiohttp.ClientSession() as session:
@@ -137,13 +138,20 @@ async def fetch_games():
                 ):
                     current_time = time.time()
 
+                    # --- Create or update entry ---
                     if game_id not in posted_games:
                         posted_games[game_id] = {
                             "message": None,
                             "start_time": current_time,
                             "closed": False,
-                            "frozen_uptime": None
+                            "frozen_uptime": None,
+                            "slotsTaken": slotsTaken,   # track last known value
+                            "slotsTotal": slotsTotal
                         }
+
+                    # Update last known slots if game is still active
+                    posted_games[game_id]["slotsTaken"] = slotsTaken
+                    posted_games[game_id]["slotsTotal"] = slotsTotal
 
                     # Only calculate uptime if the game is not closed
                     if not posted_games[game_id]["closed"]:
@@ -159,7 +167,11 @@ async def fetch_games():
                     embed.add_field(name="Map", value=map_name, inline=False)
                     embed.add_field(name="Host", value=host, inline=True)
                     embed.add_field(name="Realm", value=server, inline=True)
-                    embed.add_field(name="Players", value=f"{slotsTaken}/{slotsTotal}", inline=True)
+                    embed.add_field(
+                        name="Players",
+                        value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
+                        inline=True
+                    )
                     embed.add_field(name="Uptime", value=uptime_text, inline=True)
                     embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
 
@@ -189,7 +201,7 @@ async def fetch_games():
                         frozen_uptime = f"{minutes}m {seconds}s"
                         posted_games[game_id]["frozen_uptime"] = frozen_uptime
 
-                        # Copy embed
+                        # Copy embed and keep last known slots
                         closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
                         for field in current_embed.fields:
                             closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
@@ -206,8 +218,10 @@ async def fetch_games():
 
                     except Exception as e:
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
+
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
