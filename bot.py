@@ -138,22 +138,26 @@ async def fetch_games():
                 ):
                     current_time = time.time()
 
-                    # --- Create or update entry ---
                     if game_id not in posted_games:
                         posted_games[game_id] = {
                             "message": None,
                             "start_time": current_time,
                             "closed": False,
                             "frozen_uptime": None,
-                            "slotsTaken": slotsTaken,   # track last known value
+                            "slotsTaken": slotsTaken,   # confirmed value
+                            "pendingSlots": None,       # unconfirmed
                             "slotsTotal": slotsTotal
                         }
+                    else:
+                        # promote pending → confirmed
+                        if posted_games[game_id]["pendingSlots"] is not None:
+                            posted_games[game_id]["slotsTaken"] = posted_games[game_id]["pendingSlots"]
 
-                    # Update last known slots if game is still active
-                    posted_games[game_id]["slotsTaken"] = slotsTaken
-                    posted_games[game_id]["slotsTotal"] = slotsTotal
+                        # store new pending
+                        posted_games[game_id]["pendingSlots"] = slotsTaken
+                        posted_games[game_id]["slotsTotal"] = slotsTotal
 
-                    # Only calculate uptime if the game is not closed
+                    # uptime
                     if not posted_games[game_id]["closed"]:
                         uptime_sec = int(current_time - posted_games[game_id]["start_time"])
                         minutes, seconds = divmod(uptime_sec, 60)
@@ -162,7 +166,7 @@ async def fetch_games():
                     else:
                         uptime_text = posted_games[game_id]["frozen_uptime"]
 
-                    # Build embed
+                    # embed
                     embed = discord.Embed(title=name, color=discord.Color.green())
                     embed.add_field(name="Map", value=map_name, inline=False)
                     embed.add_field(name="Host", value=host, inline=True)
@@ -192,24 +196,46 @@ async def fetch_games():
                     if not msg or not msg.embeds:
                         continue
                     try:
-                        current_embed = msg.embeds[0]
+                        # handle pending slots before closing
+                        pending = posted_games[game_id].get("pendingSlots")
+                        confirmed = posted_games[game_id]["slotsTaken"]
 
-                        # Freeze uptime exactly now
+                        if pending is not None:
+                            # if it dropped from >1 to 1 → discard
+                            if confirmed > 1 and pending == 1:
+                                pass  # ignore pending
+                            else:
+                                posted_games[game_id]["slotsTaken"] = pending  # accept pending as final
+
+                        # freeze uptime
                         current_time = time.time()
                         uptime_sec = int(current_time - posted_games[game_id]["start_time"])
                         minutes, seconds = divmod(uptime_sec, 60)
                         frozen_uptime = f"{minutes}m {seconds}s"
                         posted_games[game_id]["frozen_uptime"] = frozen_uptime
 
-                        # Copy embed and keep last known slots
+                        # rebuild embed
+                        current_embed = msg.embeds[0]
                         closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
                         for field in current_embed.fields:
-                            closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+                            if field.name == "Players":
+                                closed_embed.add_field(
+                                    name="Players",
+                                    value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
+                                    inline=True
+                                )
+                            else:
+                                closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
 
-                        # Replace Uptime field in place
+                        # replace uptime with closed
                         for i, field in enumerate(closed_embed.fields):
                             if field.name == "Uptime":
-                                closed_embed.set_field_at(i, name="Uptime", value=f"{frozen_uptime} - *Closed*", inline=True)
+                                closed_embed.set_field_at(
+                                    i,
+                                    name="Uptime",
+                                    value=f"{frozen_uptime} - *Closed*",
+                                    inline=True
+                                )
                                 break
 
                         await msg.edit(embed=closed_embed)
@@ -219,8 +245,10 @@ async def fetch_games():
                     except Exception as e:
                         print(f"❌ Failed to mark game closed {game_id}: {e}")
 
+
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
