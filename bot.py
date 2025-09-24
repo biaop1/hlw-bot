@@ -21,6 +21,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "closed": bool, "frozen_uptime": str}
 
 # --- Store invites per guild --- 
+async def refresh_invites():
+    await bot.wait_until_ready()  # make sure the bot is fully connected
+    while not bot.is_closed():
+        for guild in bot.guilds:
+            invites = await guild.invites()
+            invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
+        await asyncio.sleep(1800)  # 30 minutes
+        bot.loop.create_task(refresh_invites())
+
 invite_cache = {}
 
 @bot.event
@@ -302,6 +311,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
