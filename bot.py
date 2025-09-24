@@ -13,11 +13,65 @@ API_URL = "https://api.wc3stats.com/gamelist"
 # --- BOT INTENTS ---
 intents = discord.Intents.default()
 intents.members = True  # needed for role assignment
+intents.invites = True
 
 # --- BOT INSTANCE ---
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "closed": bool, "frozen_uptime": str}
+
+# --- Store invites per guild --- 
+invite_cache = {}
+
+@bot.event
+async def on_ready():
+    print(f"✅ {bot.user} is online")
+    for guild in bot.guilds:
+        invites = await guild.invites()
+        invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
+
+@bot.event
+async def on_member_join(member):
+    guild = member.guild
+    invites_before = invite_cache.get(guild.id, {})
+    invites_after = await guild.invites()
+
+    used_invite = None
+    for invite in invites_after:
+        if invite.uses > invites_before.get(invite.code, 0):
+            used_invite = invite
+            break
+
+    # update cache
+    invite_cache[guild.id] = {invite.code: invite.uses for invite in invites_after}
+
+    log_channel = guild.get_channel(1420313772781862933)  # paste your channel ID
+    if log_channel:
+        embed = discord.Embed(
+            title="🟢 Member Joined",
+            description=f"{member.mention} ({member})",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="ID", value=member.id, inline=False)
+        embed.add_field(name="Account Created", value=discord.utils.format_dt(member.created_at, style='R'), inline=False)
+        if used_invite:
+            embed.add_field(name="Invite Used", value=f"https://discord.gg/{used_invite.code}\nCreated by {used_invite.inviter}", inline=False)
+        else:
+            embed.add_field(name="Invite Used", value="Unknown (maybe vanity link or expired invite)", inline=False)
+
+        await log_channel.send(embed=embed)
+
+@bot.event
+async def on_member_remove(member):
+    guild = member.guild
+    log_channel = discord.utils.get(guild.text_channels, name="join-logs")
+    if log_channel:
+        embed = discord.Embed(
+            title="🔴 Member Left",
+            description=f"{member} ({member.id})",
+            color=discord.Color.red()
+        )
+        await log_channel.send(embed=embed)
 
 # --- ROLE ASSIGNMENT --- Assign "member" on new member join. Retired module. Replaced by carl-bot
 #@bot.event
@@ -248,6 +302,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
