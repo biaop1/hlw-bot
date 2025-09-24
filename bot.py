@@ -8,7 +8,10 @@ import datetime
 start_time = time.time()  # record when the bot started
 TOKEN = os.getenv("bot_token")
 CHANNEL_ID = 1412772946845634642
-API_URL = "https://api.wc3stats.com/gamelist"
+API_HOSTS = [
+    "https://api.wc3stats.com/gamelist",        # primary
+    "https://wc3maps.com/api/lobbies"           # backup API
+]
 
 # --- BOT INTENTS ---
 intents = discord.Intents.default()
@@ -161,156 +164,163 @@ async def on_ready():
     upgrade_roles.start()  # Start role upgrade loop
 
 # --- GAME FETCH LOOP ---
-# --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
 async def fetch_games():
+    data = None
     async with aiohttp.ClientSession() as session:
-        async with session.get(API_URL) as resp:
-            if resp.status != 200:
-                print(f"❌ API request failed with status {resp.status}")
-                return
-
-            data = await resp.json()
-            games = data.get("body", [])
-            active_ids = set()
-
-            channel = bot.get_channel(CHANNEL_ID)
-            if not channel:
-                print("❌ Could not find channel!")
-                return
-
-            # --- Update or send messages for active games ---
-            for game in games:
-                game_id = game.get("id")
-                active_ids.add(game_id)
-
-                name = game.get("name", "")
-                map_name = game.get("map", "")
-                host = game.get("host", "")
-                server = game.get("server", "")
-                slotsTaken = game.get("slotsTaken", 0)
-                slotsTotal = game.get("slotsTotal", 0)
-
-                if (
-                    ("hlw" in name.lower()
-                     or "heroline" in name.lower()
-                     or "hero line" in name.lower()
-                     or "hero line" in map_name.lower()
-                     or "heroline" in map_name.lower())
-                    and "w8." not in map_name.lower()
-                ):
-                    current_time = time.time()
-
-                    if game_id not in posted_games:
-                        posted_games[game_id] = {
-                            "message": None,
-                            "start_time": current_time,
-                            "closed": False,
-                            "frozen_uptime": None,
-                            "slotsTaken": slotsTaken,   # confirmed value
-                            "pendingSlots": None,       # unconfirmed
-                            "slotsTotal": slotsTotal
-                        }
-                    else:
-                        # promote pending → confirmed
-                        if posted_games[game_id]["pendingSlots"] is not None:
-                            posted_games[game_id]["slotsTaken"] = posted_games[game_id]["pendingSlots"]
-
-                        # store new pending
-                        posted_games[game_id]["pendingSlots"] = slotsTaken
-                        posted_games[game_id]["slotsTotal"] = slotsTotal
-
-                    # uptime
-                    if not posted_games[game_id]["closed"]:
-                        uptime_sec = int(current_time - posted_games[game_id]["start_time"])
-                        minutes, seconds = divmod(uptime_sec, 60)
-                        uptime_text = f"{minutes}m {seconds}s"
-                        posted_games[game_id]["frozen_uptime"] = uptime_text
-                    else:
-                        uptime_text = posted_games[game_id]["frozen_uptime"]
-
-                    # embed
-                    embed = discord.Embed(title=name, color=discord.Color.green())
-                    embed.add_field(name="Map", value=map_name, inline=False)
-                    embed.add_field(name="Host", value=host, inline=True)
-                    embed.add_field(name="Realm", value=server, inline=True)
-                    embed.add_field(
-                        name="Players",
-                        value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
-                        inline=True
-                    )
-                    embed.add_field(name="Uptime", value=uptime_text, inline=True)
-                    embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
-
-                    msg = posted_games[game_id]["message"]
-                    if msg is None:
-                        msg = await channel.send(embed=embed)
-                        posted_games[game_id]["message"] = msg
-                    else:
-                        try:
-                            await msg.edit(embed=embed)
-                        except Exception as e:
-                            print(f"❌ Failed to edit message for {game_id}: {e}")
-
-            # --- Mark disappeared games as closed ---
-            for game_id in list(posted_games.keys()):
-                if game_id not in active_ids and not posted_games[game_id]["closed"]:
-                    msg = posted_games[game_id]["message"]
-                    if not msg or not msg.embeds:
+        for host in API_HOSTS:
+            try:
+                async with session.get(host, timeout=3) as resp:
+                    if resp.status != 200:
+                        print(f"❌ API {host} failed with status {resp.status}")
                         continue
-                    try:
-                        # handle pending slots before closing
-                        pending = posted_games[game_id].get("pendingSlots")
-                        confirmed = posted_games[game_id]["slotsTaken"]
 
-                        if pending is not None:
-                            # if it dropped from >1 to 1 → discard
-                            if confirmed > 1 and pending == 1:
-                                pass  # ignore pending
-                            else:
-                                posted_games[game_id]["slotsTaken"] = pending  # accept pending as final
+                    data = await resp.json()
+                    if not isinstance(data, dict) or "body" not in data:
+                        print(f"❌ API {host} returned invalid data")
+                        continue
 
-                        # freeze uptime
-                        current_time = time.time()
-                        uptime_sec = int(current_time - posted_games[game_id]["start_time"])
-                        minutes, seconds = divmod(uptime_sec, 60)
-                        frozen_uptime = f"{minutes}m {seconds}s"
-                        posted_games[game_id]["frozen_uptime"] = frozen_uptime
+                    if host != API_HOSTS[0]:
+                        print(f"⚠️ Using backup API: {host}")
+                    break  # success → stop trying other hosts
 
-                        # rebuild embed
-                        current_embed = msg.embeds[0]
-                        closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
-                        for field in current_embed.fields:
-                            if field.name == "Players":
-                                closed_embed.add_field(
-                                    name="Players",
-                                    value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
-                                    inline=True
-                                )
-                            else:
-                                closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+            except Exception as e:
+                print(f"❌ Request to {host} failed: {e}")
+                continue
 
-                        # replace uptime with closed
-                        for i, field in enumerate(closed_embed.fields):
-                            if field.name == "Uptime":
-                                closed_embed.set_field_at(
-                                    i,
-                                    name="Uptime",
-                                    value=f"{frozen_uptime} - *Closed*",
-                                    inline=True
-                                )
-                                break
+    if not data:
+        print("❌ All APIs failed, skipping this poll")
+        return
 
-                        await msg.edit(embed=closed_embed)
-                        posted_games[game_id]["closed"] = True
-                        print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}")
+    games = data.get("body", [])
+    active_ids = set()
 
-                    except Exception as e:
-                        print(f"❌ Failed to mark game closed {game_id}: {e}")
+    channel = bot.get_channel(CHANNEL_ID)
+    if not channel:
+        print("❌ Could not find channel!")
+        return
 
+    # --- Update or send messages for active games ---
+    for game in games:
+        game_id = game.get("id")
+        active_ids.add(game_id)
+
+        name = game.get("name", "")
+        map_name = game.get("map", "")
+        host = game.get("host", "")
+        server = game.get("server", "")
+        slotsTaken = game.get("slotsTaken", 0)
+        slotsTotal = game.get("slotsTotal", 0)
+
+        if (
+            ("hlw" in name.lower()
+             or "heroline" in name.lower()
+             or "hero line" in name.lower()
+             or "hero line" in map_name.lower()
+             or "heroline" in map_name.lower())
+            and "w8." not in map_name.lower()
+        ):
+            current_time = time.time()
+
+            if game_id not in posted_games:
+                posted_games[game_id] = {
+                    "message": None,
+                    "start_time": current_time,
+                    "closed": False,
+                    "frozen_uptime": None,
+                    "slotsTaken": slotsTaken,
+                    "pendingSlots": None,
+                    "slotsTotal": slotsTotal
+                }
+            else:
+                if posted_games[game_id]["pendingSlots"] is not None:
+                    posted_games[game_id]["slotsTaken"] = posted_games[game_id]["pendingSlots"]
+
+                posted_games[game_id]["pendingSlots"] = slotsTaken
+                posted_games[game_id]["slotsTotal"] = slotsTotal
+
+            if not posted_games[game_id]["closed"]:
+                uptime_sec = int(current_time - posted_games[game_id]["start_time"])
+                minutes, seconds = divmod(uptime_sec, 60)
+                uptime_text = f"{minutes}m {seconds}s"
+                posted_games[game_id]["frozen_uptime"] = uptime_text
+            else:
+                uptime_text = posted_games[game_id]["frozen_uptime"]
+
+            embed = discord.Embed(title=name, color=discord.Color.green())
+            embed.add_field(name="Map", value=map_name, inline=False)
+            embed.add_field(name="Host", value=host, inline=True)
+            embed.add_field(name="Realm", value=server, inline=True)
+            embed.add_field(
+                name="Players",
+                value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
+                inline=True
+            )
+            embed.add_field(name="Uptime", value=uptime_text, inline=True)
+            embed.add_field(name="\u200b", value="\u200b", inline=True if not posted_games[game_id]["closed"] else False)
+
+            msg = posted_games[game_id]["message"]
+            if msg is None:
+                msg = await channel.send(embed=embed)
+                posted_games[game_id]["message"] = msg
+            else:
+                try:
+                    await msg.edit(embed=embed)
+                except Exception as e:
+                    print(f"❌ Failed to edit message for {game_id}: {e}")
+
+    # --- Mark disappeared games as closed ---
+    for game_id in list(posted_games.keys()):
+        if game_id not in active_ids and not posted_games[game_id]["closed"]:
+            msg = posted_games[game_id]["message"]
+            if not msg or not msg.embeds:
+                continue
+            try:
+                pending = posted_games[game_id].get("pendingSlots")
+                confirmed = posted_games[game_id]["slotsTaken"]
+
+                if pending is not None:
+                    if not (confirmed > 1 and pending == 1):
+                        posted_games[game_id]["slotsTaken"] = pending
+
+                current_time = time.time()
+                uptime_sec = int(current_time - posted_games[game_id]["start_time"])
+                minutes, seconds = divmod(uptime_sec, 60)
+                frozen_uptime = f"{minutes}m {seconds}s"
+                posted_games[game_id]["frozen_uptime"] = frozen_uptime
+
+                current_embed = msg.embeds[0]
+                closed_embed = discord.Embed(title=current_embed.title, color=current_embed.color)
+                for field in current_embed.fields:
+                    if field.name == "Players":
+                        closed_embed.add_field(
+                            name="Players",
+                            value=f"{posted_games[game_id]['slotsTaken']}/{posted_games[game_id]['slotsTotal']}",
+                            inline=True
+                        )
+                    else:
+                        closed_embed.add_field(name=field.name, value=field.value, inline=field.inline)
+
+                for i, field in enumerate(closed_embed.fields):
+                    if field.name == "Uptime":
+                        closed_embed.set_field_at(
+                            i,
+                            name="Uptime",
+                            value=f"{frozen_uptime} - *Closed*",
+                            inline=True
+                        )
+                        break
+
+                await msg.edit(embed=closed_embed)
+                posted_games[game_id]["closed"] = True
+                print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}")
+
+            except Exception as e:
+                print(f"❌ Failed to mark game closed {game_id}: {e}")
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
