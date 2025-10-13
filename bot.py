@@ -252,7 +252,18 @@ async def fetch_games():
             else:
                 uptime_text = posted_games[game_id]["frozen_uptime"]
 
-            embed = discord.Embed(title=name, color=discord.Color.green())
+            # --- Determine embed color based on map name ---
+            map_lower = map_name.lower()
+            
+            if "roc" in map_lower:
+                color = discord.Color.orange()
+            elif "lition" in map_lower or "hlwl" in map_lower:
+                color = discord.Color.blue()
+            else:
+                color = discord.Color.light_grey()
+            
+            embed = discord.Embed(title=name, color=color)
+            
             embed.add_field(name="Map", value=map_name, inline=False)
             embed.add_field(name="Host", value=host, inline=True)
             embed.add_field(name="Realm", value=server, inline=True)
@@ -325,6 +336,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
