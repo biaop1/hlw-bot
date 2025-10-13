@@ -258,9 +258,9 @@ async def fetch_games():
             if "roc" in map_lower:
                 color = discord.Color.orange()
             elif "lition" in map_lower or "hlwl" in map_lower:
-                color = discord.Color.blue()
+                color = discord.Color(0x4E78F0)
             else:
-                color = discord.Color.light_grey()
+                color = discord.Color(0x787878)
             
             embed = discord.Embed(title=name, color=color)
             
@@ -336,6 +336,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
