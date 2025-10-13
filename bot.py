@@ -167,30 +167,35 @@ async def on_ready():
 @tasks.loop(seconds=9)
 async def fetch_games():
     data = None
+    api_used = None  # <--- track which API succeeded
+
     async with aiohttp.ClientSession() as session:
         for host in API_HOSTS:
             try:
                 async with session.get(host, timeout=3) as resp:
                     if resp.status != 200:
-                        print(f"❌ API {host} failed with status {resp.status}")
+                        print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
                     data = await resp.json()
                     if not isinstance(data, dict) or "body" not in data:
-                        print(f"❌ API {host} returned invalid data")
+                        print(f"[API] ❌ {host} returned invalid data")
                         continue
 
-                    if host != API_HOSTS[0]:
-                        print(f"⚠️ Using backup API: {host}")
+                    api_used = host  # <--- record which API succeeded
                     break  # success → stop trying other hosts
 
             except Exception as e:
-                print(f"❌ Request to {host} failed: {e}")
+                print(f"[API] ❌ Request to {host} failed: {e}")
                 continue
 
     if not data:
-        print("❌ All APIs failed, skipping this poll")
+        print("[API] ❌ All APIs failed, skipping this poll")
         return
+
+    # Log which API succeeded
+    print(f"[API] ✅ Using data from: {api_used}")
+
 
     games = data.get("body", [])
     active_ids = set()
@@ -320,6 +325,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
