@@ -99,7 +99,7 @@ async def on_member_remove(member):
 # --- ROLE UPGRADE CONFIG --- Upgrade role Member (Peon) to Member (Grunt)
 ROLE_X_ID = 1414518023636914278  # Existing role to track
 ROLE_Y_ID = 1413169885663727676  # Role to assign after threshold
-DAYS_THRESHOLD = 7               # Days before upgrade
+DAYS_THRESHOLD = 14               # Days before upgrade
 
 role_x_assignment = {}  # Tracks when Role X was assigned
 
@@ -339,6 +339,7 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
