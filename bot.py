@@ -114,58 +114,73 @@ async def on_member_update(before: discord.Member, after: discord.Member):
 
 @tasks.loop(hours=12)
 async def upgrade_roles():
-    try:
-        guild = bot.get_guild(GUILD_ID)
-        if not guild:
-            return
+    guild = bot.get_guild(GUILD_ID)
+    if not guild:
+        print("❌ Guild not found")
+        return
 
-        role_x = guild.get_role(ROLE_X_ID)
-        role_y = guild.get_role(ROLE_Y_ID)
-        if not role_x or not role_y:
-            print("Roles not found in guild")
-            return
+    role_x = guild.get_role(ROLE_X_ID)
+    role_y = guild.get_role(ROLE_Y_ID)
+    if not role_x or not role_y:
+        print("❌ Roles not found in guild")
+        return
 
-        now = datetime.datetime.now(datetime.timezone.utc)
+    me = guild.me or guild.get_member(bot.user.id)
+    if not me:
+        print("❌ Could not resolve bot member in guild")
+        return
 
-        # make sure members are cached in big guilds
-        try:
-            await guild.chunk(cache=True)
-        except Exception:
-            pass
+    # Hard permission/hierarchy checks (most common silent failure)
+    if not guild.me.guild_permissions.manage_roles:
+        print("❌ Bot lacks Manage Roles permission")
+        return
+    if role_x >= me.top_role or role_y >= me.top_role:
+        print("❌ Role hierarchy issue: bot top role must be ABOVE both Role X and Role Y")
+        return
 
-        for member in guild.members:
-            if member.bot:
-                continue
-            if role_x not in member.roles:
-                continue
+    now = datetime.datetime.now(datetime.timezone.utc)
 
-            assigned_at = role_x_assignment.get(member.id)
+    # ✅ IMPORTANT: fetch members from API (not cache)
+    members = [m async for m in guild.fetch_members(limit=None)]
+    print(f"[upgrade_roles] tick: members_fetched={len(members)}")
 
-            # fallback if bot wasn't online when role was granted
-            if assigned_at is None:
-                assigned_at = member.joined_at
+    candidates = 0
+    upgraded = 0
 
-            if assigned_at is None:
-                continue
+    for member in members:
+        if member.bot:
+            continue
+        if role_x not in member.roles:
+            continue
 
-            # normalize timezone (prevents "naive vs aware" crash)
-            if assigned_at.tzinfo is None:
-                assigned_at = assigned_at.replace(tzinfo=datetime.timezone.utc)
+        candidates += 1
 
-            days_with_role_x = (now - assigned_at).total_seconds() / 86400.0
+        assigned_at = role_x_assignment.get(member.id)
+        if assigned_at is None:
+            assigned_at = member.joined_at  # membership tenure fallback
 
-            if days_with_role_x >= DAYS_THRESHOLD:
-                try:
-                    await member.remove_roles(role_x, reason="Auto-upgrade after threshold")
-                    await member.add_roles(role_y, reason="Auto-upgrade after threshold")
-                    role_x_assignment.pop(member.id, None)
-                    print(f"✅ Upgraded {member.display_name} from Role X to Role Y")
-                except Exception as e:
-                    print(f"❌ Failed to upgrade {member.display_name}: {e}")
+        if assigned_at is None:
+            # if this happens a lot, your member data is incomplete
+            print(f"[upgrade_roles] {member} has no joined_at; skipping")
+            continue
 
-    except Exception as e:
-        # This prevents the loop from dying permanently on an unexpected exception
-        print(f"❌ upgrade_roles loop crashed: {e}")
+        if assigned_at.tzinfo is None:
+            assigned_at = assigned_at.replace(tzinfo=datetime.timezone.utc)
+
+        days = (now - assigned_at).total_seconds() / 86400.0
+
+        if days >= DAYS_THRESHOLD:
+            try:
+                await member.remove_roles(role_x, reason="Auto-upgrade after threshold")
+                await member.add_roles(role_y, reason="Auto-upgrade after threshold")
+                role_x_assignment.pop(member.id, None)
+                upgraded += 1
+                print(f"✅ Upgraded {member} (days={days:.2f})")
+            except Exception as e:
+                print(f"❌ Failed upgrading {member}: {e}")
+
+    print(f"[upgrade_roles] candidates_with_role_x={candidates}, upgraded={upgraded}")
+
 
 @upgrade_roles.before_loop
 async def before_upgrade_roles():
@@ -385,6 +400,7 @@ async def on_ready():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
+
 
 
 
