@@ -23,68 +23,58 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "closed": bool, "frozen_uptime": str}
 
-# --- INVITES CACHE ---
-invite_cache = {}  # guild_id -> {code: uses}
-
-@tasks.loop(minutes=30)
-async def refresh_invites_task():
-    for guild in bot.guilds:
-        try:
+# --- Store invites per guild --- 
+async def refresh_invites():
+    await bot.wait_until_ready()  # make sure the bot is fully connected
+    while not bot.is_closed():
+        for guild in bot.guilds:
             invites = await guild.invites()
             invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
-        except Exception as e:
-            print(f"❌ refresh_invites_task failed for guild {guild.id}: {e}")
+        await asyncio.sleep(1800)  # 30 minutes
+        bot.loop.create_task(refresh_invites())
 
-@refresh_invites_task.before_loop
-async def before_refresh_invites_task():
-    await bot.wait_until_ready()
+invite_cache = {}
 
-# --- MEMBER JOIN LOGGING (invite used) ---
 @bot.event
-async def on_member_join(member: discord.Member):
+async def on_ready():
+    print(f"✅ {bot.user} is online")
+    for guild in bot.guilds:
+        invites = await guild.invites()
+        invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
+
+@bot.event
+async def on_member_join(member):
     guild = member.guild
     invites_before = invite_cache.get(guild.id, {})
+    invites_after = await guild.invites()
 
     used_invite = None
-    try:
-        invites_after = await guild.invites()
-        for invite in invites_after:
-            if invite.uses > invites_before.get(invite.code, 0):
-                used_invite = invite
-                break
+    for invite in invites_after:
+        if invite.uses > invites_before.get(invite.code, 0):
+            used_invite = invite
+            break
 
-        # update cache
-        invite_cache[guild.id] = {invite.code: invite.uses for invite in invites_after}
-    except Exception as e:
-        print(f"❌ Failed to fetch invites on join: {e}")
+    # update cache
+    invite_cache[guild.id] = {invite.code: invite.uses for invite in invites_after}
 
-    log_channel = guild.get_channel(1420313772781862933)  # your channel ID
+    log_channel = guild.get_channel(1420313772781862933)  # paste your channel ID
     if log_channel:
         embed = discord.Embed(
             title="🟢 Member Joined",
             description=f"{member.mention} ({member})",
             color=discord.Color.green()
         )
-        embed.add_field(name="ID", value=str(member.id), inline=False)
+        embed.add_field(name="ID", value=member.id, inline=False)
         embed.add_field(name="Account Created", value=discord.utils.format_dt(member.created_at, style='R'), inline=False)
-
         if used_invite:
-            embed.add_field(
-                name="Invite Used",
-                value=f"https://discord.gg/{used_invite.code}\nCreated by {used_invite.inviter}",
-                inline=False
-            )
+            embed.add_field(name="Invite Used", value=f"https://discord.gg/{used_invite.code}\nCreated by {used_invite.inviter}", inline=False)
         else:
-            embed.add_field(
-                name="Invite Used",
-                value="Unknown (maybe vanity link or expired invite)",
-                inline=False
-            )
+            embed.add_field(name="Invite Used", value="Unknown (maybe vanity link or expired invite)", inline=False)
 
         await log_channel.send(embed=embed)
 
 @bot.event
-async def on_member_remove(member: discord.Member):
+async def on_member_remove(member):
     guild = member.guild
     log_channel = discord.utils.get(guild.text_channels, name="join-logs")
     if log_channel:
@@ -95,96 +85,83 @@ async def on_member_remove(member: discord.Member):
         )
         await log_channel.send(embed=embed)
 
+# --- ROLE ASSIGNMENT --- Assign "member" on new member join. Retired module. Replaced by carl-bot
+#@bot.event
+#async def on_member_join(member):
+#    role_name = "Member"
+#    role = discord.utils.get(member.guild.roles, name=role_name)
+#    if role:
+#        await member.add_roles(role)
+#        print(f"Assigned role '{role_name}' to {member.name}")
+#    else:
+#        print(f"Role '{role_name}' not found in {member.guild.name}")
+
 # --- ROLE UPGRADE CONFIG --- Upgrade role Member (Peon) to Member (Grunt)
 ROLE_X_ID = 1414518023636914278  # Existing role to track
 ROLE_Y_ID = 1413169885663727676  # Role to assign after threshold
-DAYS_THRESHOLD = 14              # Days before upgrade
+DAYS_THRESHOLD = 14               # Days before upgrade
 
-role_x_assignment = {}  # member_id -> datetime (UTC aware)
+role_x_assignment = {}  # Tracks when Role X was assigned
 
+# Track when Role X is assigned to a member
 @bot.event
-async def on_member_update(before: discord.Member, after: discord.Member):
+async def on_member_update(before, after):
     before_roles = {r.id for r in before.roles}
     after_roles = {r.id for r in after.roles}
-
+    
     # Role X newly added
     if ROLE_X_ID not in before_roles and ROLE_X_ID in after_roles:
-        # IMPORTANT: timezone-aware UTC datetime
-        role_x_assignment[after.id] = datetime.datetime.now(datetime.timezone.utc)
+        role_x_assignment[after.id] = datetime.datetime.utcnow()
 
+# Daily loop to upgrade roles
 @tasks.loop(hours=12)
 async def upgrade_roles():
+    GUILD_ID = 1412713066495217797  # replace with your guild ID
     guild = bot.get_guild(GUILD_ID)
     if not guild:
-        print("❌ Guild not found")
         return
 
     role_x = guild.get_role(ROLE_X_ID)
     role_y = guild.get_role(ROLE_Y_ID)
     if not role_x or not role_y:
-        print("❌ Roles not found in guild")
+        print("Roles not found in guild")
         return
 
-    me = guild.me or guild.get_member(bot.user.id)
-    if not me:
-        print("❌ Could not resolve bot member in guild")
-        return
-
-    # Hard permission/hierarchy checks (most common silent failure)
-    if not guild.me.guild_permissions.manage_roles:
-        print("❌ Bot lacks Manage Roles permission")
-        return
-    if role_x >= me.top_role or role_y >= me.top_role:
-        print("❌ Role hierarchy issue: bot top role must be ABOVE both Role X and Role Y")
-        return
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-
-    # ✅ IMPORTANT: fetch members from API (not cache)
-    members = [m async for m in guild.fetch_members(limit=None)]
-    print(f"[upgrade_roles] tick: members_fetched={len(members)}")
-
-    candidates = 0
-    upgraded = 0
-
-    for member in members:
+    for member in guild.members:
         if member.bot:
             continue
-        if role_x not in member.roles:
+        if role_x.id not in [r.id for r in member.roles]:
             continue
 
-        candidates += 1
-
-        assigned_at = role_x_assignment.get(member.id)
-        if assigned_at is None:
-            assigned_at = member.joined_at  # membership tenure fallback
-
-        if assigned_at is None:
-            # if this happens a lot, your member data is incomplete
-            print(f"[upgrade_roles] {member} has no joined_at; skipping")
-            continue
-
-        if assigned_at.tzinfo is None:
-            assigned_at = assigned_at.replace(tzinfo=datetime.timezone.utc)
-
-        days = (now - assigned_at).total_seconds() / 86400.0
-
-        if days >= DAYS_THRESHOLD:
+        assigned_at = role_x_assignment.get(member.id) or member.joined_at
+        now = datetime.datetime.now(datetime.timezone.utc)
+        days_with_role_x = (now - assigned_at).total_seconds() / 86400  # convert seconds to days
+        
+        if days_with_role_x >= DAYS_THRESHOLD:
             try:
-                await member.remove_roles(role_x, reason="Auto-upgrade after threshold")
-                await member.add_roles(role_y, reason="Auto-upgrade after threshold")
+                await member.remove_roles(role_x)
+                await member.add_roles(role_y)
                 role_x_assignment.pop(member.id, None)
-                upgraded += 1
-                print(f"✅ Upgraded {member} (days={days:.2f})")
+                print(f"Upgraded {member.display_name} from Role X to Role Y")
             except Exception as e:
-                print(f"❌ Failed upgrading {member}: {e}")
-
-    print(f"[upgrade_roles] candidates_with_role_x={candidates}, upgraded={upgraded}")
+                print(f"❌ Failed to upgrade {member.display_name}: {e}")
 
 
-@upgrade_roles.before_loop
-async def before_upgrade_roles():
-    await bot.wait_until_ready()
+
+# --- READY EVENT ---
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+
+    try:
+        with open("map_icon.png", "rb") as f:
+            await bot.user.edit(avatar=f.read())
+        print("✅ Avatar updated")
+    except Exception as e:
+        print(f"❌ Failed to update avatar: {e}")
+
+    fetch_games.start()
+    upgrade_roles.start()  # Start role upgrade loop
 
 # --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
@@ -360,61 +337,6 @@ async def fetch_games():
             except Exception as e:
                 print(f"❌ Failed to mark game closed {game_id}: {e}")
 
-# --- ONE MERGED READY EVENT ---
-_avatar_set = False
-
-@bot.event
-async def on_ready():
-    global _avatar_set
-
-    print(f"✅ Logged in as {bot.user}")
-
-    # init invite cache immediately
-    for guild in bot.guilds:
-        try:
-            invites = await guild.invites()
-            invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
-        except Exception as e:
-            print(f"❌ Failed to init invites for guild {guild.id}: {e}")
-
-    # update avatar once (avoids hammering rate limits on reconnect)
-    if not _avatar_set:
-        try:
-            with open("map_icon.png", "rb") as f:
-                await bot.user.edit(avatar=f.read())
-            print("✅ Avatar updated")
-            _avatar_set = True
-        except Exception as e:
-            print(f"❌ Failed to update avatar: {e}")
-
-    # start tasks safely (on_ready can fire multiple times)
-    if not refresh_invites_task.is_running():
-        refresh_invites_task.start()
-
-    if not fetch_games.is_running():
-        fetch_games.start()
-
-    if not upgrade_roles.is_running():
-        upgrade_roles.start()
-
-
 # --- RUN BOT ---
 bot.run(TOKEN)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
