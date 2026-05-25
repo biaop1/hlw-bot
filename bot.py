@@ -172,7 +172,12 @@ async def fetch_games():
     async with aiohttp.ClientSession() as session:
         for host in API_HOSTS:
             try:
-                async with session.get(host, timeout=3) as resp:
+                async with session.get(
+                    host,
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=3
+                ) as resp:
+                    
                     if resp.status != 200:
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
