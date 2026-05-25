@@ -9,8 +9,8 @@ start_time = time.time()  # record when the bot started
 TOKEN = os.getenv("bot_token")
 CHANNEL_ID = 1412772946845634642
 API_HOSTS = [
-    "https://api.wc3stats.com/gamelist",        # primary
-    "https://wc3maps.com/api/lobbies"           # backup API
+    "https://wc3maps.com/api/lobbies",        # primary
+    "https://api.wc3stats.com/gamelist"           # backup API
 ]
 
 # --- BOT INTENTS ---
