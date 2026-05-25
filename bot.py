@@ -167,28 +167,31 @@ async def on_ready():
 @tasks.loop(seconds=9)
 async def fetch_games():
     data = None
-    api_used = None  # <--- track which API succeeded
+    api_used = None
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json",
+        "Referer": "https://wc3maps.com/"
+    }
 
     async with aiohttp.ClientSession() as session:
         for host in API_HOSTS:
             try:
-                async with session.get(
-                    host,
-                    headers={"User-Agent": "Mozilla/5.0"},
-                    timeout=3
-                ) as resp:
-                    
+                async with session.get(host, headers=headers, timeout=3) as resp:
+
                     if resp.status != 200:
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
                     data = await resp.json()
+
                     if not isinstance(data, dict) or "body" not in data:
                         print(f"[API] ❌ {host} returned invalid data")
                         continue
 
-                    api_used = host  # <--- record which API succeeded
-                    break  # success → stop trying other hosts
+                    api_used = host
+                    break
 
             except Exception as e:
                 print(f"[API] ❌ Request to {host} failed: {e}")
@@ -197,7 +200,6 @@ async def fetch_games():
     if not data:
         print("[API] ❌ All APIs failed, skipping this poll")
         return
-
     # Log which API succeeded
     print(f"[API] ✅ Using data from: {api_used}")
 
