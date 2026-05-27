@@ -12,7 +12,7 @@ primary_region = 'arn'
   PORT = '8080'
 
 [processes]
-  app = 'python main.py'
+  app = 'python bot.py'
 
 [http_service]
   internal_port = 8080
