@@ -5,7 +5,7 @@ primary_region = 'ams'
   PORT = '8080'
 
 [processes]
-  app = "python main.py"
+  app = "python bot.py"
 
 [[vm]]
   memory = '256mb'
