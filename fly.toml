@@ -1,26 +1,8 @@
-# fly.toml app configuration file generated for hlw-bot on 2026-05-27T12:53:29Z
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = 'hlw-bot'
-primary_region = 'arn'
+primary_region = 'ams'
 
-[build]
-
-[env]
-  PORT = '8080'
-
-[processes]
-  app = 'python bot.py'
-
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+[deploy]
+  strategy = "immediate"
 
 [[vm]]
   memory = '256mb'
