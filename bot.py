@@ -226,6 +226,8 @@ async def fetch_games():
     for game in games:
         game_id = game.get("id")
         active_ids.add(game_id)
+
+        print(f"[DEBUG] game_id={game_id} name={game.get('name', '')} map={game.get('map', game.get('path', ''))}", flush=True)
     
         name = game.get("name", "")
         map_name = game.get("map") or game.get("path", "")
