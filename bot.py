@@ -226,7 +226,8 @@ async def fetch_games():
     for game in games:
         game_id = game.get("id")
         active_ids.add(game_id)
-
+    
+        name = game.get("name", "")
         map_name = game.get("map") or game.get("path", "")
         host = game.get("host", "")
         server = game.get("server") or game.get("region", "")
