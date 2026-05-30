@@ -183,7 +183,6 @@ async def fetch_games():
                     if resp.status != 200:
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
-
                     data = await resp.json()
                     
                     if not isinstance(data, dict):
