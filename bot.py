@@ -184,39 +184,15 @@ async def fetch_games():
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
-                    raw = await resp.json()
-                    
-                    if not isinstance(raw, dict):
+                    data = await resp.json()
+
+                    if not isinstance(data, dict) or "body" not in data:
                         print(f"[API] ❌ {host} returned invalid data")
                         continue
-                    
-                    # wc3stats / old format
-                    if "body" in raw:
-                        data = raw
-                    
-                    # wc3maps format
-                    elif "data" in raw:
-                        data = {
-                            "body": [
-                                {
-                                    "id": f"wc3maps:{game.get('host', '')}:{game.get('name', '')}:{game.get('path', '')}:{game.get('created', '')}",
-                                    "name": game.get("name", ""),
-                                    "map": game.get("path", ""),
-                                    "host": game.get("host", ""),
-                                    "server": game.get("region", ""),
-                                    "slotsTaken": game.get("slots_taken", 0),
-                                    "slotsTotal": game.get("slots_total", 0),
-                                }
-                                for game in raw["data"]
-                            ]
-                        }
-                    
-                    else:
-                        print(f"[API] ❌ {host} returned invalid data")
-                        continue
-                    
+
                     api_used = host
                     break
+
             except Exception as e:
                 print(f"[API] ❌ Request to {host} failed: {e}")
                 continue
