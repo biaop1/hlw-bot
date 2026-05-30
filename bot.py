@@ -224,18 +224,19 @@ async def fetch_games():
 
     # --- Update or send messages for active games ---
     for game in games:
-        game_id = game.get("id")
-        active_ids.add(game_id)
-
-        print(f"[DEBUG] game_id={game_id} name={game.get('name', '')} map={game.get('map', game.get('path', ''))}", flush=True)
-    
         name = game.get("name", "")
         map_name = game.get("map") or game.get("path", "")
         host = game.get("host", "")
         server = game.get("server") or game.get("region", "")
         slotsTaken = game.get("slotsTaken", game.get("slots_taken", 0))
         slotsTotal = game.get("slotsTotal", game.get("slots_total", 0))
-
+    
+        if api_used and "wc3maps.com" in api_used:
+            game_id = f"{host}|{name}|{map_name}|{server}"
+        else:
+            game_id = game.get("id")
+    
+        active_ids.add(game_id)
         if (
             ("hlw" in name.lower()
              or "heroline" in name.lower()
