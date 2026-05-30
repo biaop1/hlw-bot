@@ -184,36 +184,36 @@ async def fetch_games():
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
-                            data = await resp.json()
-                            
-                            if not isinstance(data, dict):
-                                print(f"[API] ❌ {host} returned invalid data")
-                                continue
-                            
-                            if "body" in data:
-                                data["body"] = data["body"]
-                            
-                            elif "data" in data:
-                                # wc3maps format -> normalize to your bot's expected format
-                                data["body"] = [
-                                    {
-                                        "id": game.get("id"),
-                                        "name": game.get("name", ""),
-                                        "map": game.get("path", ""),
-                                        "host": game.get("host", ""),
-                                        "server": game.get("region", ""),
-                                        "slotsTaken": game.get("slots_taken", 0),
-                                        "slotsTotal": game.get("slots_total", 0),
-                                    }
-                                    for game in data["data"]
-                                ]
-                            
-                            else:
-                                print(f"[API] ❌ {host} returned invalid data")
-                                continue
-                            
-                            api_used = host
-                            break
+                    data = await resp.json()
+                    
+                    if not isinstance(data, dict):
+                        print(f"[API] ❌ {host} returned invalid data")
+                        continue
+                    
+                    if "body" in data:
+                        data["body"] = data["body"]
+                    
+                    elif "data" in data:
+                        # wc3maps format -> normalize to your bot's expected format
+                        data["body"] = [
+                            {
+                                "id": game.get("id"),
+                                "name": game.get("name", ""),
+                                "map": game.get("path", ""),
+                                "host": game.get("host", ""),
+                                "server": game.get("region", ""),
+                                "slotsTaken": game.get("slots_taken", 0),
+                                "slotsTotal": game.get("slots_total", 0),
+                            }
+                            for game in data["data"]
+                        ]
+                    
+                    else:
+                        print(f"[API] ❌ {host} returned invalid data")
+                        continue
+                    
+                    api_used = host
+                    break
 
             except Exception as e:
                 print(f"[API] ❌ Request to {host} failed: {e}")
