@@ -37,7 +37,7 @@ invite_cache = {}
 
 @bot.event
 async def on_ready():
-    print(f"✅ {bot.user} is online")
+    print(f"✅ {bot.user} is online", flush=True)
     for guild in bot.guilds:
         invites = await guild.invites()
         invite_cache[guild.id] = {invite.code: invite.uses for invite in invites}
@@ -151,7 +151,7 @@ async def upgrade_roles():
 # --- READY EVENT ---
 @bot.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    print(f"Logged in as {bot.user}", flush=True)
 
     try:
         with open("map_icon.png", "rb") as f:
@@ -181,13 +181,13 @@ async def fetch_games():
                 async with session.get(host, headers=headers, timeout=3) as resp:
 
                     if resp.status != 200:
-                        print(f"[API] ❌ {host} failed with status {resp.status}")
+                        print(f"[API] ❌ {host} failed with status {resp.status}", flush=True)
                         continue
 
                     data = await resp.json()
                     
                     if not isinstance(data, dict):
-                        print(f"[API] ❌ {host} returned invalid data")
+                        print(f"[API] ❌ {host} returned invalid data", flush=True)
                         continue
                     
                     if "body" in data and isinstance(data["body"], list):
@@ -197,21 +197,21 @@ async def fetch_games():
                         data["body"] = data["data"]
                     
                     else:
-                        print(f"[API] ❌ {host} returned invalid data")
+                        print(f"[API] ❌ {host} returned invalid data", flush=True)
                         continue
                     
                     api_used = host
                     break
 
             except Exception as e:
-                print(f"[API] ❌ Request to {host} failed: {e}")
+                print(f"[API] ❌ Request to {host} failed: {e}", flush=True)
                 continue
 
     if not data:
-        print("[API] ❌ All APIs failed, skipping this poll")
+        print("[API] ❌ All APIs failed, skipping this poll", flush=True)
         return
     # Log which API succeeded
-    print(f"[API] ✅ Using data from: {api_used}")
+    print(f"[API] ✅ Using data from: {api_used}", flush=True)
 
 
     games = data.get("body", [])
@@ -219,7 +219,7 @@ async def fetch_games():
 
     channel = bot.get_channel(CHANNEL_ID)
     if not channel:
-        print("❌ Could not find channel!")
+        print("❌ Could not find channel!", flush=True)
         return
 
     # --- Update or send messages for active games ---
@@ -306,7 +306,7 @@ async def fetch_games():
                 try:
                     await msg.edit(embed=embed)
                 except Exception as e:
-                    print(f"❌ Failed to edit message for {game_id}: {e}")
+                    print(f"❌ Failed to edit message for {game_id}: {e}", flush=True))
 
     # --- Mark disappeared games as closed ---
     for game_id in list(posted_games.keys()):
@@ -352,10 +352,10 @@ async def fetch_games():
 
                 await msg.edit(embed=closed_embed)
                 posted_games[game_id]["closed"] = True
-                print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}")
+                print(f"Marked game {game_id} as Closed with frozen uptime {frozen_uptime}", flush=True)
 
             except Exception as e:
-                print(f"❌ Failed to mark game closed {game_id}: {e}")
+                print(f"❌ Failed to mark game closed {game_id}: {e}", flush=True)
 
 # --- RUN BOT ---
 bot.run(TOKEN)
