@@ -306,7 +306,7 @@ async def fetch_games():
                 try:
                     await msg.edit(embed=embed)
                 except Exception as e:
-                    print(f"❌ Failed to edit message for {game_id}: {e}", flush=True))
+                    print(f"❌ Failed to edit message for {game_id}: {e}", flush=True)
 
     # --- Mark disappeared games as closed ---
     for game_id in list(posted_games.keys()):
