@@ -184,12 +184,35 @@ async def fetch_games():
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
-                    data = await resp.json()
-
-                    if not isinstance(data, dict) or "body" not in data:
+                    raw = await resp.json()
+                    
+                    if not isinstance(raw, dict):
                         print(f"[API] ❌ {host} returned invalid data")
                         continue
-
+                    
+                    if "body" in raw:
+                        data = raw
+                    
+                    elif "data" in raw:
+                        data = {
+                            "body": [
+                                {
+                                    "id": game.get("id"),
+                                    "name": game.get("name", ""),
+                                    "map": game.get("path", ""),
+                                    "host": game.get("host", ""),
+                                    "server": game.get("region", ""),
+                                    "slotsTaken": game.get("slots_taken", 0),
+                                    "slotsTotal": game.get("slots_total", 0),
+                                }
+                                for game in raw["data"]
+                            ]
+                        }
+                    
+                    else:
+                        print(f"[API] ❌ {host} returned invalid data")
+                        continue
+                    
                     api_used = host
                     break
 
