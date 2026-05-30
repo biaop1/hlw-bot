@@ -184,30 +184,17 @@ async def fetch_games():
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
 
-                    raw = await resp.json()
+                    data = await resp.json()
                     
-                    if not isinstance(raw, dict):
+                    if not isinstance(data, dict):
                         print(f"[API] ❌ {host} returned invalid data")
                         continue
                     
-                    if "body" in raw:
-                        data = raw
+                    if "body" in data and isinstance(data["body"], list):
+                        pass
                     
-                    elif "data" in raw:
-                        data = {
-                            "body": [
-                                {
-                                    "id": game.get("id"),
-                                    "name": game.get("name", ""),
-                                    "map": game.get("path", ""),
-                                    "host": game.get("host", ""),
-                                    "server": game.get("region", ""),
-                                    "slotsTaken": game.get("slots_taken", 0),
-                                    "slotsTotal": game.get("slots_total", 0),
-                                }
-                                for game in raw["data"]
-                            ]
-                        }
+                    elif "data" in data and isinstance(data["data"], list):
+                        data["body"] = data["data"]
                     
                     else:
                         print(f"[API] ❌ {host} returned invalid data")
@@ -240,12 +227,11 @@ async def fetch_games():
         game_id = game.get("id")
         active_ids.add(game_id)
 
-        name = game.get("name", "")
-        map_name = game.get("map", "")
+        map_name = game.get("map") or game.get("path", "")
         host = game.get("host", "")
-        server = game.get("server", "")
-        slotsTaken = game.get("slotsTaken", 0)
-        slotsTotal = game.get("slotsTotal", 0)
+        server = game.get("server") or game.get("region", "")
+        slotsTaken = game.get("slotsTaken", game.get("slots_taken", 0))
+        slotsTotal = game.get("slotsTotal", game.get("slots_total", 0))
 
         if (
             ("hlw" in name.lower()
@@ -256,8 +242,7 @@ async def fetch_games():
             and "w8." not in map_name.lower()
         ):
             current_time = time.time()
-            print("GAME ID:", game_id)
-            print("KNOWN IDS:", len(posted_games))
+
             if game_id not in posted_games:
                 posted_games[game_id] = {
                     "message": None,
