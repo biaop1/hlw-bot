@@ -183,29 +183,33 @@ async def fetch_games():
                     if resp.status != 200:
                         print(f"[API] ❌ {host} failed with status {resp.status}")
                         continue
-                    data = await resp.json()
+
+                    raw = await resp.json()
                     
-                    if not isinstance(data, dict):
+                    if not isinstance(raw, dict):
                         print(f"[API] ❌ {host} returned invalid data")
                         continue
                     
-                    if "body" in data:
-                        data["body"] = data["body"]
+                    # wc3stats / old format
+                    if "body" in raw:
+                        data = raw
                     
-                    elif "data" in data:
-                        # wc3maps format -> normalize to your bot's expected format
-                        data["body"] = [
-                            {
-                                "id": game.get("id"),
-                                "name": game.get("name", ""),
-                                "map": game.get("path", ""),
-                                "host": game.get("host", ""),
-                                "server": game.get("region", ""),
-                                "slotsTaken": game.get("slots_taken", 0),
-                                "slotsTotal": game.get("slots_total", 0),
-                            }
-                            for game in data["data"]
-                        ]
+                    # wc3maps format
+                    elif "data" in raw:
+                        data = {
+                            "body": [
+                                {
+                                    "id": f"wc3maps:{game.get('host', '')}:{game.get('name', '')}:{game.get('path', '')}:{game.get('created', '')}",
+                                    "name": game.get("name", ""),
+                                    "map": game.get("path", ""),
+                                    "host": game.get("host", ""),
+                                    "server": game.get("region", ""),
+                                    "slotsTaken": game.get("slots_taken", 0),
+                                    "slotsTotal": game.get("slots_total", 0),
+                                }
+                                for game in raw["data"]
+                            ]
+                        }
                     
                     else:
                         print(f"[API] ❌ {host} returned invalid data")
@@ -213,7 +217,6 @@ async def fetch_games():
                     
                     api_used = host
                     break
-
             except Exception as e:
                 print(f"[API] ❌ Request to {host} failed: {e}")
                 continue
@@ -367,4 +370,3 @@ async def fetch_games():
 
 # --- RUN BOT ---
 bot.run(TOKEN)
-
