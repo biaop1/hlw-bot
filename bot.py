@@ -256,7 +256,8 @@ async def fetch_games():
             and "w8." not in map_name.lower()
         ):
             current_time = time.time()
-
+            print("GAME ID:", game_id)
+            print("KNOWN IDS:", len(posted_games))
             if game_id not in posted_games:
                 posted_games[game_id] = {
                     "message": None,
