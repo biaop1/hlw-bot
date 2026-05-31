@@ -255,7 +255,7 @@ async def fetch_games():
                     "frozen_uptime": None,
                     "slotsTaken": slotsTaken,
                     "pendingSlots": None,
-                    "slotsTotal": slotsTotal
+                    "slotsTotal": slotsTotal,
                     "misses": 0
                 }
             else:
