@@ -233,12 +233,8 @@ async def fetch_games():
         slotsTaken = game.get("slotsTaken", game.get("slots_taken", 0))
         slotsTotal = game.get("slotsTotal", game.get("slots_total", 0))
     
-        if api_used and "wc3maps.com" in api_used:
-            game_id = f"{host}|{name}|{map_name}|{server}"
-        else:
-            game_id = game.get("id")
-    
-        active_ids.add(game_id)
+        game_id = f"{host}|{name}|{map_name}".lower()
+
         if (
             ("hlw" in name.lower()
              or "heroline" in name.lower()
@@ -247,6 +243,7 @@ async def fetch_games():
              or "heroline" in map_name.lower())
             and "hlw8." not in map_name.lower()
         ):
+            active_ids.add(game_id)
             if api_used != last_logged_api:
                 print(f"[API] ✅ Using data from: {api_used}", flush=True)
                 last_logged_api = api_used
