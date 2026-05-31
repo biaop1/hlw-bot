@@ -256,6 +256,7 @@ async def fetch_games():
                     "slotsTaken": slotsTaken,
                     "pendingSlots": None,
                     "slotsTotal": slotsTotal
+                    "misses": 0
                 }
             else:
                 if posted_games[game_id]["pendingSlots"] is not None:
@@ -263,6 +264,7 @@ async def fetch_games():
 
                 posted_games[game_id]["pendingSlots"] = slotsTaken
                 posted_games[game_id]["slotsTotal"] = slotsTotal
+                posted_games[game_id]["misses"] = 0
 
             if not posted_games[game_id]["closed"]:
                 uptime_sec = int(current_time - posted_games[game_id]["start_time"])
@@ -311,6 +313,12 @@ async def fetch_games():
     # --- Mark disappeared games as closed ---
     for game_id in list(posted_games.keys()):
         if game_id not in active_ids and not posted_games[game_id]["closed"]:
+            posted_games[game_id]["misses"] = posted_games[game_id].get("misses", 0) + 1
+    
+            if posted_games[game_id]["misses"] < 4:
+                print(f"Missed {game_id} {posted_games[game_id]['misses']}/4 before closing", flush=True)
+                continue
+    
             msg = posted_games[game_id]["message"]
             if not msg or not msg.embeds:
                 continue
