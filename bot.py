@@ -244,15 +244,16 @@ async def fetch_games():
             and "hlw8." not in map_name.lower()
         ):
             active_ids.add(game_id)
+        
             if api_used != last_logged_api:
                 print(f"[API] ✅ Using data from: {api_used}", flush=True)
                 last_logged_api = api_used
-                current_time = time.time()
-                
-                # If this lobby key exists but was already marked closed,
-                # treat it as a newly remade lobby and do NOT edit the old closed embed.
-                if game_id in posted_games and posted_games[game_id]["closed"]:
-                    posted_games.pop(game_id)
+        
+            current_time = time.time()
+            # If this lobby key exists but was already marked closed,
+            # treat it as a newly remade lobby and do NOT edit the old closed embed.
+            if game_id in posted_games and posted_games[game_id]["closed"]:
+                posted_games.pop(game_id)
                 
                 if game_id not in posted_games:
                     posted_games[game_id] = {
