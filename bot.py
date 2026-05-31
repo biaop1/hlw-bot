@@ -250,29 +250,30 @@ async def fetch_games():
                 last_logged_api = api_used
         
             current_time = time.time()
+            
             # If this lobby key exists but was already marked closed,
             # treat it as a newly remade lobby and do NOT edit the old closed embed.
             if game_id in posted_games and posted_games[game_id]["closed"]:
                 posted_games.pop(game_id)
-                
-                if game_id not in posted_games:
-                    posted_games[game_id] = {
-                        "message": None,
-                        "start_time": current_time,
-                        "closed": False,
-                        "frozen_uptime": None,
-                        "slotsTaken": slotsTaken,
-                        "pendingSlots": None,
-                        "slotsTotal": slotsTotal,
-                        "misses": 0
-                    }
-                else:
-                    if posted_games[game_id]["pendingSlots"] is not None:
-                        posted_games[game_id]["slotsTaken"] = posted_games[game_id]["pendingSlots"]
-                
-                    posted_games[game_id]["pendingSlots"] = slotsTaken
-                    posted_games[game_id]["slotsTotal"] = slotsTotal
-                    posted_games[game_id]["misses"] = 0
+            
+            if game_id not in posted_games:
+                posted_games[game_id] = {
+                    "message": None,
+                    "start_time": current_time,
+                    "closed": False,
+                    "frozen_uptime": None,
+                    "slotsTaken": slotsTaken,
+                    "pendingSlots": None,
+                    "slotsTotal": slotsTotal,
+                    "misses": 0
+                }
+            else:
+                if posted_games[game_id]["pendingSlots"] is not None:
+                    posted_games[game_id]["slotsTaken"] = posted_games[game_id]["pendingSlots"]
+            
+                posted_games[game_id]["pendingSlots"] = slotsTaken
+                posted_games[game_id]["slotsTotal"] = slotsTotal
+                posted_games[game_id]["misses"] = 0
 
             if not posted_games[game_id]["closed"]:
                 uptime_sec = int(current_time - posted_games[game_id]["start_time"])
