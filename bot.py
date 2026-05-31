@@ -22,6 +22,7 @@ intents.invites = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 posted_games = {}  # game_id -> {"message": msg, "start_time": timestamp, "closed": bool, "frozen_uptime": str}
+last_logged_api = None
 
 # --- Store invites per guild --- 
 async def refresh_invites():
@@ -166,6 +167,7 @@ async def on_ready():
 # --- GAME FETCH LOOP ---
 @tasks.loop(seconds=9)
 async def fetch_games():
+    global last_logged_api
     data = None
     api_used = None
 
@@ -211,7 +213,7 @@ async def fetch_games():
         print("[API] ❌ All APIs failed, skipping this poll", flush=True)
         return
     # Log which API succeeded
-    print(f"[API] ✅ Using data from: {api_used}", flush=True)
+    # print(f"[API] ✅ Using data from: {api_used}", flush=True)
 
 
     games = data.get("body", [])
@@ -243,8 +245,11 @@ async def fetch_games():
              or "hero line" in name.lower()
              or "hero line" in map_name.lower()
              or "heroline" in map_name.lower())
-            and "w8." not in map_name.lower()
+            and "hlw8." not in map_name.lower()
         ):
+            if api_used != last_logged_api:
+                print(f"[API] ✅ Using data from: {api_used}", flush=True)
+                last_logged_api = api_used
             current_time = time.time()
 
             if game_id not in posted_games:
